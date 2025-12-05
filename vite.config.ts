@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -9,6 +10,51 @@ export default defineConfig({
         plugins: [['babel-plugin-react-compiler']],
       },
     }),
+    VitePWA({
+      registerType: 'prompt',
+      devOptions: {
+        enabled: true
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+      },
+      manifest: {
+        name: 'spritron',
+        short_name: 'sprtr',
+        description: 'Create animations from spritesheets',
+        theme_color: '#121212',
+        background_color: '#121212',
+        // Icons generator: https://vite-pwa-org.netlify.app/guide/pwa-minimal-requirements.html#icons-images
+        icons: [
+          {
+            src: 'pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png'
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
+        ],
+        orientation: "landscape",
+        start_url: "/spritron/",
+        scope: "/spritron/",
+        // display: "standalone"
+      },
+    })
   ],
   base: "/spritron/"
 })
