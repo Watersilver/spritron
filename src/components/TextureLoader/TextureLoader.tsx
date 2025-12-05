@@ -136,7 +136,7 @@ function TextureLoader({
         setHoveringImage(false);
       }}
     >
-      Click or drag and drop here
+      Here ya go
       <input
         type="file"
         accept="image/*"
