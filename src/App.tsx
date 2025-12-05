@@ -17,17 +17,17 @@ const darkTheme = createTheme({
   },
 });
 
-function CoordsTracker() {
-  const coords = useWatch(() => store.workArea, () => ({mouse: {...store.workArea.mousePos}, ...store.workArea.pos}));
-  return <Box sx={{gridArea: 'c'}}>
-    <Box>
-      Mouse: x = {coords.mouse.x} | y = {coords.mouse.y}
-    </Box>
-    <Box>
-      Position: x = {coords.x} | y = {coords.y}
-    </Box>
-  </Box>
-}
+// function CoordsTracker() {
+//   const coords = useWatch(() => store.workArea, () => ({mouse: {...store.workArea.mousePos}, ...store.workArea.pos}));
+//   return <Box sx={{gridArea: 'c'}}>
+//     <Box>
+//       Mouse: x = {coords.mouse.x} | y = {coords.mouse.y}
+//     </Box>
+//     <Box>
+//       Position: x = {coords.x} | y = {coords.y}
+//     </Box>
+//   </Box>
+// }
 
 function App() {
   const [theme] = useState(darkTheme);
@@ -62,7 +62,6 @@ function App() {
           gridTemplateAreas: `
             "a b b"
             "a b b"
-            "c c c"
           `,
           gridTemplateColumns: "auto 1fr 1fr",
           gridTemplateRows: "1fr 1fr auto"
@@ -78,7 +77,7 @@ function App() {
         <TextureDisplayer
           sx={{gridArea: "b"}}
         />
-        <CoordsTracker />
+        {/* <CoordsTracker /> */}
         {/* <Box>
           <Button onClick={() => setShow(p=>!p)}>{show ? "Hide" : "Show"}</Button>
           {show ? <TextureDisplayer /> : null}
