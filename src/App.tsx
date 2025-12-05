@@ -9,7 +9,7 @@ import { Box, createTheme, CssBaseline, ThemeProvider } from "@mui/material";
 import TextureLoader from "./components/TextureLoader/TextureLoader";
 import { useState } from "react";
 import TextureDisplayer from "./components/TextureDisplayer/TextureDisplayer";
-import store, { useWatch } from "./store/store";
+// import store, { useWatch } from "./store/store";
 
 const darkTheme = createTheme({
   palette: {
