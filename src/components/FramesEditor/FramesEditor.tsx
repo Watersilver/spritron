@@ -130,6 +130,9 @@ function ImageFramesEditor({
   return frames ? <Fragment>
     <Card
       // variant="outlined"
+      sx={{
+        borderRadius: 0
+      }}
     >
       <CardContent>
         <Box

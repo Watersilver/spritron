@@ -69,8 +69,7 @@ function App() {
       >
         <TextureLoader
           sx={{
-            gridArea: "a",
-            overflow: 'auto'
+            gridArea: "a"
           }}
           editable
         />

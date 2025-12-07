@@ -1,6 +1,7 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import { Box, Button, Card, CardContent, Collapse, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, type SxProps, type Theme } from "@mui/material"
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import { Box, Card, CardContent, Collapse, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Typography, type SxProps, type Theme } from "@mui/material"
 import { Fragment, useEffect, useRef, useState } from "react";
 import store, { useWatch } from "../../store/store";
 import FramesEditor from "../FramesEditor/FramesEditor";
@@ -62,10 +63,13 @@ function TextureLoader({
       store.selectedImage = files[selectedIndex.current]!.name;
     } else if (files.length > 0) {
       store.selectedImage = files[files.length - 1]!.name;
+    } else {
+      store.selectedImage = null;
     }
   }, [files]);
 
   const [hoveringImage, setHoveringImage] = useState(false);
+  // const [_, setHoveringImage] = useState(false);
 
   const storeImages = (files: File[]) => {
     if (files.length == 0) return;
@@ -85,135 +89,308 @@ function TextureLoader({
 
   const loadingImages = imLength !== files.length;
 
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onDragOver = (e: DragEvent) => {
+      if (!e.dataTransfer) return;
+      const fileItems = [...e.dataTransfer.items].filter(
+        (item) => item.kind === "file",
+      );
+      if (fileItems.length > 0) {
+        e.preventDefault();
+        if (fileItems.some((item) => item.type.startsWith("image/"))) {
+          e.dataTransfer.dropEffect = "copy";
+        } else {
+          e.dataTransfer.dropEffect = "none";
+        }
+      }
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!e.dataTransfer) return;
+      if (loadingImages) return;
+      const files = [...e.dataTransfer.items]
+        .flatMap(i => {
+          const f = i.getAsFile()
+          if (!f) return [];
+          return [f];
+        });
+      storeImages(files);
+      e.preventDefault();
+    };
+    const onDragEnter = () => setHoveringImage(true);
+
+    // Disable as it triggers for leaving every element, not just the window
+    // Handle this case at the full screen drop prompt Box
+    // const onDragLeave = () => setHoveringImage(false);
+
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("drop", onDrop);
+    window.addEventListener("dragenter", onDragEnter);
+    // window.addEventListener("dragleave", onDragLeave);
+
+    return () => {
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("drop", onDrop);
+      window.removeEventListener("dragenter", onDragEnter);
+      // window.removeEventListener("dragleave", onDragLeave);
+    }
+  }, [loadingImages]);
+
+
+  const resizableUploadArea = useRef<HTMLDivElement>(null);
+  const [showUploadButton, setShowUploadButton] = useState(false);
+  useEffect(() => {
+    if (!resizableUploadArea.current) return;
+    const d = resizableUploadArea.current;
+
+    const ro = new ResizeObserver((e) => {
+      const entry = e.find(entry => entry.target === d)
+      if (entry) {
+        const size = entry.contentBoxSize.reduce((a, c) => ({
+          blockSize: a.blockSize + c.blockSize,
+          inlineSize: a.inlineSize + c.inlineSize
+        }), {blockSize: 0, inlineSize: 0});
+        if (size.blockSize === 0) {
+          setShowUploadButton(true);
+        } else {
+          setShowUploadButton(false);
+        }
+      }
+    });
+
+    ro.observe(d);
+
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+
+
   return <Box
     style={style}
     sx={sx}
+    // Uncomment if I want drag and drop to not work on whole window
+    // onDrop={e => {
+    //   if (loadingImages) return;
+    //   const files = [...e.dataTransfer.items]
+    //     .flatMap(i => {
+    //       const f = i.getAsFile()
+    //       if (!f) return [];
+    //       return [f];
+    //     });
+    //   storeImages(files);
+    //   e.preventDefault();
+    // }}
+    // onDragOver={e => {
+    //   const fileItems = [...e.dataTransfer.items].filter(
+    //     (item) => item.kind === "file",
+    //   );
+    //   if (fileItems.length > 0) {
+    //     e.preventDefault();
+    //     if (fileItems.some((item) => item.type.startsWith("image/"))) {
+    //       e.dataTransfer.dropEffect = "copy";
+    //     } else {
+    //       e.dataTransfer.dropEffect = "none";
+    //     }
+    //   }
+    // }}
+    // onDragEnter={() => {
+    //   setHoveringImage(true);
+    // }}
+    // onDragLeave={() => {
+    //   setHoveringImage(false);
+    // }}
+
+    // onClick={() => {
+    //   store.selectedImage = null;
+    // }}
   >
-    <Box
-      // ref={dropZone}
-      component="label"
+    <input
+      type="file"
+      accept="image/*"
+      disabled={loadingImages}
+      ref={inputRef}
+      multiple
+      onChange={e => {
+        storeImages([...(e.target.files || [])]);
+      }}
+      style={{
+        display: "none"
+      }}
+    />
+    {
+      hoveringImage
+      ? <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          bottom: 0,
+          right: 0,
+          overflow: "hidden",
+          backdropFilter: "blur(5px)",
+          zIndex: 1000,
+          display: "grid",
+          alignItems: "center",
+          justifyItems: "center",
+          // pointerEvents: "none"
+        }}
+        onClick={() => setHoveringImage(false)}
+        onDragLeave={() => setHoveringImage(false)}
+        onMouseLeave={() => setHoveringImage(false)}
+      >
+        <Card>
+          <CardContent>
+            <Typography
+              variant='h6'
+              color='info'
+            >
+              Drop a spritesheet anywhere
+            </Typography>
+          </CardContent>
+        </Card>
+      </Box>
+      : null
+    }
+    {/* In case I want to animate this uncomment following */}
+    {/* <Box
       sx={{
-        margin: 1,
-        padding: 1,
-        display: "flex",
+        position: "absolute",
+        top: hoveringImage ? 0 : "50%",
+        left: hoveringImage ? 0 : "50%",
+        bottom: hoveringImage ? 0 : "50%",
+        right: hoveringImage ? 0 : "50%",
+        overflow: "hidden",
+        backdropFilter: hoveringImage ? "blur(5px)" : undefined,
+        // transition: "all 0.1s",
+        zIndex: 1000,
+        display: "grid",
         alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 1,
-        minHeight: 64,
-        opacity: loadingImages ? 0.5 : 1,
-        border: theme => {
-          return (hoveringImage ? theme.palette.primary.main : theme.palette.secondary.main) + " dotted 1px"
-        },
-      }}
-      onDrop={e => {
-        if (loadingImages) return;
-        const files = [...e.dataTransfer.items]
-          .flatMap(i => {
-            const f = i.getAsFile()
-            if (!f) return [];
-            return [f];
-          });
-        storeImages(files);
-        e.preventDefault();
-      }}
-      onDragOver={e => {
-        const fileItems = [...e.dataTransfer.items].filter(
-          (item) => item.kind === "file",
-        );
-        if (fileItems.length > 0) {
-          e.preventDefault();
-          if (fileItems.some((item) => item.type.startsWith("image/"))) {
-            e.dataTransfer.dropEffect = "copy";
-          } else {
-            e.dataTransfer.dropEffect = "none";
-          }
-        }
-      }}
-      onDragEnter={() => {
-        setHoveringImage(true);
-      }}
-      onDragLeave={() => {
-        setHoveringImage(false);
+        justifyItems: "center",
+        pointerEvents: "none"
       }}
     >
-      Click/Drag+drop
-      <input
-        type="file"
-        accept="image/*"
-        disabled={loadingImages}
-        multiple
-        onChange={e => {
-          storeImages([...(e.target.files || [])]);
-        }}
-        style={{
-          display: "none"
-        }}
-      />
-    </Box>
-    <List>
-      {
-        files.map((file, i) => {
-          const isSelected = selected === file.name;
-          return <Fragment key={file.name}>
-            <ListItem disablePadding>
-              <ListItemButton
-                selected={isSelected}
-                onClick={() => {store.selectedImage = file.name}}
-                sx={{
-                  paddingRight: 0,
-                  "--del-op": 0,
-                  "&:hover": {
-                    "--del-op": 1
-                  }
-                }}
-              >
-                <ListItemText primary={file.name} />
-                <IconButton
-                  color='error'
-                  disabled={loadingImages}
-                  sx={{
-                    overflow: "hidden",
-                    opacity: "var(--del-op)",
-                    transition: "opacity 0.1s"
+      <Card>
+        <CardContent>
+          Drop a spritesheet anywhere
+        </CardContent>
+      </Card>
+    </Box> */}
+    <Box
+      sx={{
+        height: "100%",
+        display: "grid",
+        gridTemplateRows: "auto 1fr",
+      }}
+    >
+      <List
+        disablePadding
+        onClick={e => {e.stopPropagation()}}
+        sx={{overflow: "auto"}}
+      >
+        {/* <Collapse
+          in={store.selectedImage !== null}
+          onClick={() => store.selectedImage = null}
+        >
+          <ListItemButton
+            sx={{
+              position: "relative",
+              p: 0
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: 'center',
+                position: "absolute",
+                left: 0, top: 0, bottom: 0, right: 0
+              }}
+            >
+              <ArrowDropDownIcon fontSize='small' />
+            </Box>
+            <ArrowDropDownIcon fontSize='small' sx={{visibility: "hidden"}} />
+          </ListItemButton>
+        </Collapse>
+        <Collapse
+          in={store.selectedImage === null}
+        >
+          <ListItemButton
+            onClick={() => {
+              inputRef.current?.click();
+            }}
+          >
+            <ListItemIcon>
+              <UploadFileIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary="Add spritesheet"
+              secondary="can drag & drop"
+            />
+            <input
+              type="file"
+              accept="image/*"
+              disabled={loadingImages}
+              ref={inputRef}
+              multiple
+              onChange={e => {
+                storeImages([...(e.target.files || [])]);
+              }}
+              style={{
+                display: "none"
+              }}
+            />
+          </ListItemButton>
+        </Collapse> */}
+        {
+          files.map((file, i) => {
+            const isSelected = selected === file.name;
+            return <Fragment key={file.name}>
+              <ListItem disablePadding>
+                <ListItemButton
+                  selected={isSelected}
+                  onClick={() => {
+                    if (store.selectedImage === file.name) {
+                      store.selectedImage = null;
+                    } else {
+                      store.selectedImage = file.name;
+                    }
                   }}
-                  onClick={e => {
-                    store.files.splice(i, 1);
-                    delete store.frames[file.name];
-                    e.stopPropagation();
+                  sx={{
+                    paddingRight: 0,
+                    "--del-op": 0,
+                    "&:hover": {
+                      "--del-op": 1
+                    }
                   }}
                 >
-                  <DeleteOutlineIcon />
-                </IconButton>
-              </ListItemButton>
-              {/* <ListItemButton>
-                <ListItemIcon>
-                  <Clear />
-                </ListItemIcon>
-              </ListItemButton> */}
-              {/* <IconButton
-                disabled={loadingImages}
-                onClick={() => {
-                  store.files.splice(i, 1);
-                }}
-              >
-                <Clear />
-              </IconButton> */}
-            </ListItem>
-            <Collapse in={isSelected} timeout="auto" unmountOnExit>
-              <Card
-                sx={{
-                  borderTopLeftRadius: 0,
-                  borderTopRightRadius: 0,
-                  borderTop: 0,
-                  marginX: 1
-                }}
-                variant='outlined'
-              >
-                <CardContent
+                  <ListItemText primary={file.name} />
+                  <IconButton
+                    color='error'
+                    disabled={loadingImages}
+                    sx={{
+                      overflow: "hidden",
+                      opacity: "var(--del-op)",
+                      transition: "opacity 0.1s"
+                    }}
+                    onClick={e => {
+                      store.files.splice(i, 1);
+                      delete store.frames[file.name];
+                      e.stopPropagation();
+                    }}
+                  >
+                    <DeleteOutlineIcon />
+                  </IconButton>
+                </ListItemButton>
+              </ListItem>
+              <Collapse in={isSelected} timeout="auto" unmountOnExit>
+                <Box
+                  // sx={theme => ({
                   sx={{
-                    padding: 0,
-                    paddingBottom: "0 !important"
+                    // Mimic button selection
+                    borderLeft: "rgba(144, 202, 249, 0.16) solid 8px"
                   }}
+                  // })}
                 >
                   <List disablePadding>
                     <FramesEditor
@@ -251,19 +428,74 @@ function TextureLoader({
                       <ListItemText primary="Add frames" />
                     </ListItemButton> : null}
                   </List>
-                </CardContent>
-              </Card>
-            </Collapse>
-          </Fragment>
-        })
-      }
-    </List>
-    <Button
-      disabled={loadingImages}
-      onClick={() => store.files = []}
-    >
-      Clear
-    </Button>
+                </Box>
+              </Collapse>
+            </Fragment>
+          })
+        }
+      </List>
+      <Box
+        position="relative"
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            left: 0, top: 0, bottom: 0, right: 0,
+            display: 'grid',
+            alignItems: "center",
+            justifyItems: "center",
+            overflow: 'hidden'
+          }}
+          onClick={() => {
+            inputRef.current?.click();
+          }}
+          ref={resizableUploadArea}
+        >
+          <Box
+            sx={{
+              width: "100%",
+              display: 'grid',
+              justifyItems: "center",
+              opacity: files.length !== 0 ? 0.1 : 0.5,
+              px: 4
+            }}
+          >
+            <UploadFileIcon
+              fontSize='large'
+            />
+            <Typography
+              variant='h6'
+              align='center'
+            >
+              {
+                files.length !== 0
+                ? "You can add another image"
+                : "Click or drag and drop to add image"
+              }
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+      <Collapse
+        in={showUploadButton}
+      >
+        <List>
+          <ListItemButton
+            onClick={() => {
+              inputRef.current?.click();
+            }}
+          >
+            <ListItemIcon>
+              <UploadFileIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary="Add spritesheet"
+              secondary="can drag & drop"
+            />
+          </ListItemButton>
+        </List>
+      </Collapse>
+    </Box>
   </Box>;
 };
 

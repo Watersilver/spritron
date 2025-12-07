@@ -1,7 +1,7 @@
 import { autoDetectRenderer, Container, FederatedPointerEvent, Graphics, Sprite } from "pixi.js";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import useResource from "../../utils/useResource";
-import store, { useWatch } from "../../store/store";
+import store, { ImageAsset, useWatch } from "../../store/store";
 import { Box, type SxProps, type Theme } from "@mui/material";
 
 (window as any).spriteset = new Set();
@@ -19,6 +19,8 @@ function TextureDisplayer({
 
   const div = useRef<HTMLDivElement>(null);
 
+
+  // Setup/cleanup renderer and scene
   const {data: scene} = useResource({
     creator: async () => {
       const renderer = await autoDetectRenderer({});
@@ -53,6 +55,8 @@ function TextureDisplayer({
     deps: []
   });
 
+
+  // Canvas resize logic
   useEffect(() => {
     if (!scene || !div.current) return;
     const cDiv = div.current;
@@ -66,26 +70,37 @@ function TextureDisplayer({
         }), {blockSize: 0, inlineSize: 0});
         scene.renderer.resize(size.inlineSize, size.blockSize);
       }
-      cDiv
     });
 
     ro.observe(cDiv);
 
-    () => {
+    return () => {
       ro.disconnect();
     }
   }, [scene]);
 
+
   const images = useWatch(() => store.images.length, () => [...store.images]);
 
-  const selectedImage = useWatch(() => store.selectedImage, () => store.selectedImage);
+  const selectedImageName = useWatch(() => store.selectedImage, () => store.selectedImage);
 
-  const selectedSpritesheetSprite = useMemo(() => {
-    if (!scene) return null;
-    const image = images.find(image => image.file.name === selectedImage);
-    if (!image) return null;
-    return Object.assign(Sprite.from(image.texture), {image});
-  }, [images, scene, selectedImage]);
+  const [selectedSpritesheetSprite, setSelectedSpritesheetSprite] = useState<(Sprite & {
+    image: ImageAsset;
+  }) | null>(null);
+
+  useEffect(() => {
+    if (!scene) {
+      setSelectedSpritesheetSprite(null);
+      return;
+    }
+    const image = images.find(image => image.file.name === selectedImageName);
+    if (!image) {
+      setSelectedSpritesheetSprite(null);
+      return;
+    }
+    const newSpr = Sprite.from(image.texture);
+    setSelectedSpritesheetSprite(Object.assign(newSpr, {image}));
+  }, [images, scene, selectedImageName]);
 
   useEffect(() => {
     if (!selectedSpritesheetSprite) return;
