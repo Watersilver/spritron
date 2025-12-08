@@ -29,8 +29,8 @@ function TextureDisplayer({
       const workArea = new Container();
       workArea.eventMode = "static";
       stage.addChild(workArea);
-      const debugCursor = new Graphics().circle(0, 0, 3).fill(0xff0000);
-      debugCursor.zIndex = 100;
+      const debugCursor = new Graphics().rect(0, 0, 1, 1).fill(0xff0000);
+      debugCursor.zIndex = 200;
       workArea.addChild(debugCursor);
 
       const grid = new Graphics();
@@ -132,6 +132,7 @@ function TextureDisplayer({
 
   const rerenderGrid = useRef(false);
 
+  // const test =
   useWatch(
     [
       () => store.workArea.scale,
@@ -143,18 +144,10 @@ function TextureDisplayer({
     () => {
       rerenderGrid.current = true;
 
-      // if (store.selectedImage === null) return null;
-
-      // const f = store.frames[store.selectedImage]?.find(f => f.id === store.selectedFrames);
-
-      // if (!f) return null;
-
       // return {
-      //   ...f,
-      //   dimensions: {...f.dimensions},
-      //   position: {...f.position},
-      //   padding: {...f.padding},
-      //   grid: {...f.grid}
+      //   origin: deproxify(store.workArea.pos),
+      //   grid: deproxify(store.selectedImage !== null ? store.frames[store.selectedImage]?.find(f => f.id === store.selectedFrames) ?? null : null),
+      //   scale: store.workArea.scale
       // }
     }
   );
@@ -173,7 +166,7 @@ function TextureDisplayer({
         workArea.position = store.workArea.pos;
 
         if (workArea.scale.x !== store.workArea.scale) {
-          debugCursor.scale = 1 / store.workArea.scale;
+          // debugCursor.scale = 1 / store.workArea.scale;
 
           const ratio = store.workArea.scale/workArea.scale.x;
           const oldWorkAreaMousePos = workArea.toLocal(store.mousePos);
@@ -268,6 +261,30 @@ function TextureDisplayer({
                   .stroke({pixelLine: true, color: 0xff0000});
                 }
               }
+
+              const dist = 16 / store.workArea.scale;
+
+              let y = f.position.y;
+              for (let x = Math.floor(ls.x / dist) * dist; x < ls.x + lw; x += dist) {
+                grid.moveTo(x + dist * 0.5, y);
+                grid.lineTo(x + dist, y);
+              }
+              y = y + f.dimensions.y + (f.grid.y - 1) * (f.dimensions.y + f.padding.y);
+              for (let x = Math.floor(ls.x / dist) * dist; x < ls.x + lw; x += dist) {
+                grid.moveTo(x + dist * 0.5, y);
+                grid.lineTo(x + dist, y);
+              }
+              let x = f.position.x;
+              for (let y = Math.floor(ls.y / dist) * dist; y < ls.y + lh; y += dist) {
+                grid.moveTo(x, y + dist * 0.5);
+                grid.lineTo(x, y + dist);
+              }
+              x = x + f.dimensions.x + (f.grid.x - 1) * (f.dimensions.x + f.padding.x);
+              for (let y = Math.floor(ls.y / dist) * dist; y < ls.y + lh; y += dist) {
+                grid.moveTo(x, y + dist * 0.5);
+                grid.lineTo(x, y + dist);
+              }
+              grid.stroke({color: 0x00ff00, pixelLine: true});
             }
           }
         }
@@ -353,13 +370,54 @@ function TextureDisplayer({
   }, [scene]);
 
   return <Box
+    position="relative"
     style={{
       overflow: "hidden",
       ...style
     }}
     sx={sx}
-    ref={div}
-  />;
+  >
+    <Box
+      position="absolute"
+      sx={{width: "100%", height: "100%"}}
+      ref={div}
+    />
+    {/* I can do html elemnt overlay on canvas! Fuck yeah! */}
+    {/* <Box
+      position="absolute"
+      sx={{
+        width: "100%", height: "100%",
+        pointerEvents: 'none'
+      }}
+    >
+      <Button
+        variant="contained"
+        sx={{
+          pointerEvents: 'auto',
+          position: 'absolute',
+          left: test.origin.x + "px",
+          top: test.origin.y + "px",
+          width: (48 * test.scale) + "px",
+          height: (48 * test.scale) + "px",
+          minWidth: 0,
+          minHeight: 0,
+          maxWidth: 'none',
+          maxHeight: 'none',
+          p: 0
+        }}
+      >
+      </Button>
+    </Box> */}
+  </Box>;
+
+  // return <Box
+  //   style={{
+  //     overflow: "hidden",
+  //     ...style
+  //   }}
+  //   sx={sx}
+  //   ref={div}
+  // />;
 }
 
 export default TextureDisplayer;

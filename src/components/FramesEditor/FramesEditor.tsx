@@ -1,7 +1,8 @@
 import { Box, Card, CardContent, Collapse, IconButton, List, ListItem, ListItemButton, ListItemText, TextField, Typography, type SxProps } from "@mui/material"
 import store, { useWatch } from "../../store/store";
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import ClearIcon from '@mui/icons-material/Clear';
+import { subscribe } from "../../libs/proxy-state";
 
 function Coords({
   frames,
@@ -89,36 +90,79 @@ function Coords({
 }
 
 function ImageFramesEditor({
-  framesIndex,
+  framesId,
   imageName
 }: {
-  framesIndex: number;
+  framesId: number;
   imageName: string;
 }) {
-  const frames = useWatch(() => store.frames[imageName]![framesIndex], () => {
-    if (!store.frames[imageName]?.[framesIndex]) return null;
-    const f = store.frames[imageName][framesIndex];
-    return {
-      id: f.id,
-      name: f.name,
-      padding: {
-        x: f.padding.x,
-        y: f.padding.y,
-      },
-      position: {
-        x: f.position.x,
-        y: f.position.y,
-      },
-      dimensions: {
-        x: f.dimensions.x,
-        y: f.dimensions.y,
-      },
-      grid: {
-        x: f.grid.x,
-        y: f.grid.y,
-      }
+  const [frames, setFrames] = useState<{
+    id: number;
+    framesIndex: number;
+    name: string;
+    padding: {
+        x: number;
+        y: number;
+    };
+    position: {
+        x: number;
+        y: number;
+    };
+    dimensions: {
+        x: number;
+        y: number;
+    };
+    grid: {
+        x: number;
+        y: number;
+    };
+  } | null>(null);
+  useEffect(() => {
+    const framesIndex = store.frames[imageName]?.findIndex(f => f.id === framesId) ?? -1;
+    const v = store.frames[imageName]?.[framesIndex];
+    if (v) {
+      setFrames({...v, framesIndex});
     }
-  });
+    return subscribe(() => store.frames[imageName]![framesIndex], () => {
+      const v = store.frames[imageName]?.[framesIndex];
+      if (v) {
+        setFrames({...v, framesIndex});
+      }
+    });
+  }, [framesId, imageName]);
+  // const frames = useWatch(
+  //   () => store.frames[imageName]![framesIndex],
+  //   () => {
+  //     const framesIndex = store.frames[imageName]?.find(f => f.id === framesId) ?? -1;
+  //   },
+  //   () => {
+  //     const framesIndex = store.frames[imageName]?.findIndex(f => f.id === framesId) ?? -1;
+  //     const f = store.frames[imageName]?.[framesIndex];
+  //     if (!f) return null;
+  //     return {
+  //       id: f.id,
+  //       framesIndex,
+  //       name: f.name,
+  //       padding: {
+  //         x: f.padding.x,
+  //         y: f.padding.y,
+  //       },
+  //       position: {
+  //         x: f.position.x,
+  //         y: f.position.y,
+  //       },
+  //       dimensions: {
+  //         x: f.dimensions.x,
+  //         y: f.dimensions.y,
+  //       },
+  //       grid: {
+  //         x: f.grid.x,
+  //         y: f.grid.y,
+  //       }
+  //     }
+  //   }
+  // );
+  const framesIndex = frames?.framesIndex ?? -1;
 
   const cellSx: SxProps = {
     display: "grid",
@@ -196,6 +240,12 @@ function ImageFramesEditor({
           <Box
             sx={cellSx}
           >
+            <Typography sx={{display: "inline"}}>Position</Typography>
+            <Coords frames={frames} field="position" framesIndex={framesIndex} imageName={imageName} />
+          </Box>
+          <Box
+            sx={cellSx}
+          >
             <Box>
               <Typography sx={{display: "inline"}}>Padding</Typography>
               {/* {frames.offsetMerged ? <Box
@@ -244,13 +294,7 @@ function ImageFramesEditor({
           <Box
             sx={cellSx}
           >
-            <Typography sx={{display: "inline"}}>Position</Typography>
-            <Coords frames={frames} field="position" framesIndex={framesIndex} imageName={imageName} />
-          </Box>
-          <Box
-            sx={cellSx}
-          >
-            <Typography sx={{display: "inline"}}>Dimensions</Typography>
+            <Typography sx={{display: "inline"}}>Cell size</Typography>
             <Coords
               frames={frames}
               field="dimensions"
@@ -271,7 +315,7 @@ function ImageFramesEditor({
               // }
             }
           >
-            <Typography sx={{display: "inline"}}>Grid</Typography>
+            <Typography sx={{display: "inline"}}>Partition</Typography>
             <Coords
               frames={frames}
               field="grid"
@@ -299,14 +343,19 @@ function FramesEditor({
 }) {
 
   // Not optimal rendering but this wont ever be big enough to cause a problem
-  const frames = useWatch(() => store.frames[image], () => ([...(store.frames[image] || [])]));
   const selectedImage = useWatch(() => store.selectedImage, () => store.selectedImage);
   const selectedFrames = useWatch(() => store.selectedFrames, () => store.selectedFrames);
-// ClearIcon
+  const frames = useWatch(
+    () => store.frames[image],
+    () => {
+      return (store.frames[image] || []).map(e => ({...e}));
+    }
+  );
+
   return <List disablePadding>
     {
       frames ?
-      frames.map((value, i) => {
+      frames.map((value) => {
         const isSelected = image === selectedImage
           && selectedFrames === value.id;
         const nameClashes = frames.some(f => f.name === value.name && value !== f);
@@ -382,8 +431,10 @@ function FramesEditor({
                       helperText={emptyName ? "name is empty" : nameClashes ? "duplicate name" : undefined}
                       value={value.name}
                       onChange={e => {
-                        if (!store.frames[image] || !store.frames[image][i]) return;
-                        store.frames[image][i].name = e.target.value;
+                        if (!store.frames[image]) return;
+                        const v = store.frames[image].find(f => f.id === value.id);
+                        if (!v) return;
+                        v.name = e.target.value;
                       }}
                       onClick={e => e.stopPropagation()}
                       sx={{
@@ -411,9 +462,11 @@ function FramesEditor({
                     transition: "opacity 0.1s"
                   }}
                   onClick={e => {
-                    if (!store.frames[image] || !store.frames[image][i]) return;
-                    store.frames[image].splice(i, 1);
                     e.stopPropagation();
+                    if (!store.frames[image]) return;
+                    const i = store.frames[image].findIndex(f => f.id === value.id);
+                    if (i === -1) return;
+                    store.frames[image].splice(i, 1);
                   }}
                 >
                   <ClearIcon />
@@ -425,7 +478,7 @@ function FramesEditor({
           <Collapse
             in={isSelected}
           >
-            <ImageFramesEditor imageName={image} framesIndex={i} />
+            <ImageFramesEditor imageName={image} framesId={value.id} />
           </Collapse>
         </Fragment>
       }) : null

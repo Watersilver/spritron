@@ -405,12 +405,12 @@ function TextureLoader({
                         let i = 1;
                         const frames = store.frames[file.name];
                         while (frames) {
-                          if (frames.some(f => f.name === "frames" + i)) {
+                          if (frames.some(f => f.name === "grid_" + i)) {
                             i++;
                           } else {
                             frames.push({
                               id: store.nextFramesId,
-                              name: "frames" + i,
+                              name: "grid_" + i,
                               position: {x: 0, y: 0},
                               padding: {x: 0, y: 0},
                               grid: {x: 1, y: 1},
@@ -425,7 +425,7 @@ function TextureLoader({
                       <ListItemIcon>
                         <AddIcon />
                       </ListItemIcon>
-                      <ListItemText primary="Add frames" />
+                      <ListItemText primary="Add grid" />
                     </ListItemButton> : null}
                   </List>
                 </Box>
@@ -444,7 +444,8 @@ function TextureLoader({
             display: 'grid',
             alignItems: "center",
             justifyItems: "center",
-            overflow: 'hidden'
+            overflow: 'hidden',
+            // cursor: files.length === 0 ? "pointer" : undefined
           }}
           onClick={() => {
             inputRef.current?.click();
@@ -457,7 +458,8 @@ function TextureLoader({
               display: 'grid',
               justifyItems: "center",
               opacity: files.length !== 0 ? 0.1 : 0.5,
-              px: 4
+              px: 4,
+              userSelect: "none",
             }}
           >
             <UploadFileIcon
@@ -479,7 +481,7 @@ function TextureLoader({
       <Collapse
         in={showUploadButton}
       >
-        <List>
+        <List disablePadding>
           <ListItemButton
             onClick={() => {
               inputRef.current?.click();
@@ -490,7 +492,6 @@ function TextureLoader({
             </ListItemIcon>
             <ListItemText
               primary="Add spritesheet"
-              secondary="can drag & drop"
             />
           </ListItemButton>
         </List>
