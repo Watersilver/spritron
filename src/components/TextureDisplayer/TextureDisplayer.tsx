@@ -290,10 +290,10 @@ function TextureDisplayer({
         }
 
 
-
         renderer.render({
           container: stage,
-          clear: true
+          clear: true,
+          clearColor: store.canvasColor
         });
 
         id = requestAnimationFrame(render);

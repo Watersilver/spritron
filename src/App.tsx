@@ -5,10 +5,15 @@
 import "./libs/proxy-state/tests"
 
 
-import { Box, createTheme, CssBaseline, ThemeProvider } from "@mui/material";
+import { Box, createTheme, CssBaseline, ThemeProvider, Typography } from "@mui/material";
 import TextureLoader from "./components/TextureLoader/TextureLoader";
 import { useState } from "react";
 import TextureDisplayer from "./components/TextureDisplayer/TextureDisplayer";
+import MenuBar from "./components/MenuBar/MenuBar";
+import store, { useWatch } from "./store/store";
+import { deproxify } from "./libs/proxy-state";
+import AnimationMenu from "./components/AnimationMenu/AnimationMenu";
+import AnimationPreview from "./components/AnimationPreview/AnimationPreview";
 // import store, { useWatch } from "./store/store";
 
 const darkTheme = createTheme({
@@ -17,17 +22,15 @@ const darkTheme = createTheme({
   },
 });
 
-// function CoordsTracker() {
-//   const coords = useWatch(() => store.workArea, () => ({mouse: {...store.workArea.mousePos}, ...store.workArea.pos}));
-//   return <Box sx={{gridArea: 'c'}}>
-//     <Box>
-//       Mouse: x = {coords.mouse.x} | y = {coords.mouse.y}
-//     </Box>
-//     <Box>
-//       Position: x = {coords.x} | y = {coords.y}
-//     </Box>
-//   </Box>
-// }
+function CoordsTracker() {
+  const mousePos = useWatch(() => store.workArea.mousePos, () => deproxify(store.workArea.mousePos));
+
+  return <Box sx={{gridArea: 'd'}}>
+    <Typography variant="subtitle2" color="textSecondary">
+      [{Math.floor(mousePos.x)},{Math.floor(mousePos.y)}]
+    </Typography>
+  </Box>
+}
 
 function App() {
   const [theme] = useState(darkTheme);
@@ -60,23 +63,33 @@ function App() {
           bottom: 0,
           display: 'grid',
           gridTemplateAreas: `
-            "a b b"
-            "a b b"
+            "a c e"
+            "a b e"
+            "a b e"
+            "a f e"
+            "a d e"
           `,
-          gridTemplateColumns: "auto 1fr 1fr",
-          gridTemplateRows: "1fr 1fr auto"
+          gridTemplateColumns: "auto 1fr auto",
+          gridTemplateRows: "auto 1fr 1fr auto auto"
         }}
       >
+        <MenuBar
+          sx={{gridArea: "c"}}
+        />
         <TextureLoader
-          sx={{
-            gridArea: "a"
-          }}
+          sx={{gridArea: "a"}}
           editable
         />
         <TextureDisplayer
           sx={{gridArea: "b"}}
         />
-        {/* <CoordsTracker /> */}
+        <AnimationMenu
+          sx={{gridArea: "e"}}
+        />
+        <AnimationPreview
+          sx={{gridArea: "f"}}
+        />
+        <CoordsTracker />
         {/* <Box>
           <Button onClick={() => setShow(p=>!p)}>{show ? "Hide" : "Show"}</Button>
           {show ? <TextureDisplayer /> : null}

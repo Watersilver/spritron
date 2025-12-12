@@ -1,4 +1,4 @@
-import { Box, Card, CardContent, Collapse, IconButton, List, ListItem, ListItemButton, ListItemText, TextField, Typography, type SxProps } from "@mui/material"
+import { Box, Card, CardContent, Collapse, FormHelperText, IconButton, List, ListItem, ListItemButton, ListItemText, TextField, Typography, type SxProps } from "@mui/material"
 import store, { useWatch } from "../../store/store";
 import { Fragment, useEffect, useState } from "react";
 import ClearIcon from '@mui/icons-material/Clear';
@@ -361,6 +361,7 @@ function FramesEditor({
         const nameClashes = frames.some(f => f.name === value.name && value !== f);
         const emptyName = value.name === "";
         const error = emptyName || nameClashes;
+        const hText = emptyName ? "name is empty" : nameClashes ? "duplicate name" : undefined;
 
         return <Fragment key={value.id}>
           <ListItem disablePadding>
@@ -417,7 +418,7 @@ function FramesEditor({
                         visibility: "hidden"
                       }}
                     >
-                      {value.name}
+                      {value.name || "a"}
                     </Box>
                     {/* 
                       https://css-tricks.com/auto-growing-inputs-textareas/
@@ -428,7 +429,6 @@ function FramesEditor({
                       size="small"
                       variant="standard"
                       error={error}
-                      helperText={emptyName ? "name is empty" : nameClashes ? "duplicate name" : undefined}
                       value={value.name}
                       onChange={e => {
                         if (!store.frames[image]) return;
@@ -444,6 +444,16 @@ function FramesEditor({
                       }}
                       fullWidth
                     />
+                    {
+                      hText
+                      ? <FormHelperText
+                        sx={{pt: 0.5}}
+                        error
+                      >
+                        {hText}
+                      </FormHelperText>
+                      : null
+                    }
                   </Box>
                   : <Box
                     component="span"
