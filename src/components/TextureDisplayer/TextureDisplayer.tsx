@@ -13,12 +13,7 @@ function TextureDisplayer({
   sx?: SxProps<Theme>;
   style?: React.CSSProperties;
 }) {
-  useEffect(() => {
-    autoDetectRenderer({});
-  });
-
-  const div = useRef<HTMLDivElement>(null);
-
+  const canvasContainer = useRef<HTMLDivElement>(null);
 
   // Setup/cleanup renderer and scene
   const {data: scene} = useResource({
@@ -50,7 +45,7 @@ function TextureDisplayer({
       scene.debugCursor.destroy();
       scene.workArea.destroy();
       scene.stage.destroy();
-      scene.renderer.destroy(true);
+      scene.renderer.destroy();
     },
     deps: []
   });
@@ -58,8 +53,8 @@ function TextureDisplayer({
 
   // Canvas resize logic
   useEffect(() => {
-    if (!scene || !div.current) return;
-    const cDiv = div.current;
+    if (!scene || !canvasContainer.current) return;
+    const cDiv = canvasContainer.current;
 
     const ro = new ResizeObserver((e) => {
       const entry = e.find(entry => entry.target === cDiv)
@@ -121,11 +116,13 @@ function TextureDisplayer({
     };
   }, [selectedSpritesheetSprite]);
 
+
+  // Add canvas to dom
   useEffect(() => {
-    if (div.current && scene) {
-      div.current.innerHTML = "";
+    if (canvasContainer.current && scene) {
+      canvasContainer.current.innerHTML = "";
       if (scene.renderer.view.canvas instanceof HTMLCanvasElement) {
-        div.current.appendChild(scene.renderer.view.canvas);
+        canvasContainer.current.appendChild(scene.renderer.view.canvas);
       }
     }
   }, [scene]);
@@ -139,6 +136,7 @@ function TextureDisplayer({
       () => store.workArea.pos,
       () => store.selectedFrames,
       () => store.selectedImage,
+      () => store.pointing,
       () => store.frames // Suboptimal but who cares? I don't.
     ],
     () => {
@@ -220,8 +218,8 @@ function TextureDisplayer({
 
               grid.rect(ls.x, ls.y, lw, lh).fill({color: 0x000000, alpha: 0.5});
 
-              const w = f.dimensions.x
-              const h = f.dimensions.y
+              const w = f.dimensions.x;
+              const h = f.dimensions.y;
 
               for (let c = 0; c < f.grid.x; c++) {
                 for (let r = 0; r < f.grid.y; r++) {
@@ -257,8 +255,19 @@ function TextureDisplayer({
                 for (let r = 0; r < f.grid.y; r++) {
                   const startX = f.position.x + (f.padding.x + w) * c;
                   const startY = f.position.y + (f.padding.y + h) * r;
+
                   grid.rect(startX, startY, w, h)
                   .stroke({pixelLine: true, color: 0xff0000});
+
+                  if (
+                    f.id === store.pointing?.framesId
+                    && startX === store.pointing.x
+                    && startY === store.pointing.y
+                  ) {
+                    grid.blendMode = 'multiply';
+                    grid.fill({color: 0xffffff, alpha: 0.25});
+                    grid.blendMode = 'normal';
+                  }
                 }
               }
 
@@ -290,6 +299,15 @@ function TextureDisplayer({
         }
 
 
+        if (store.grabbing) {
+          // document.body.style.cursor = 'grab';
+          document.body.style.cursor = 'grabbing';
+        } else if (store.pointing) {
+          document.body.style.cursor = 'pointer';
+        } else {
+          document.body.style.cursor = 'auto';
+        }
+
         renderer.render({
           container: stage,
           clear: true,
@@ -311,17 +329,15 @@ function TextureDisplayer({
     if (!canvas) return;
 
     const grab = () => {
-      document.body.style.cursor = 'grab';
       store.grabbing = true;
     }
 
     const ungrab = () => {
-      document.body.style.cursor = 'auto';
       store.grabbing = false;
     }
 
     const mouseDown = async (e: PointerEvent) => {
-      const d = div.current;
+      const d = canvasContainer.current;
       if (!d) return;
 
       if (e.button === 1) {
@@ -330,7 +346,7 @@ function TextureDisplayer({
     }
 
     const mouseUp = (e: PointerEvent) => {
-      const d = div.current;
+      const d = canvasContainer.current;
       if (!d) return;
 
       if (e.button === 1) {
@@ -352,6 +368,49 @@ function TextureDisplayer({
     const mouseMoveWorkArea = (e: FederatedPointerEvent) => {
       store.mousePos.x = e.global.x;
       store.mousePos.y = e.global.y;
+      const {x, y} = e.getLocalPosition(scene.workArea);
+
+      if (!scene.renderer.canvas.matches(":hover")) {
+        store.pointing = null;
+        return;
+      }
+
+      if (!store.selectedImage || store.selectedAnimation === null) {
+        store.pointing = null;
+        return;
+      }
+      const f = store.frames[store.selectedImage]?.find(f => f.id === store.selectedFrames);
+      if (!f) {
+        store.pointing = null;
+        return;
+      }
+
+      const w = f.dimensions.x;
+      const h = f.dimensions.y;
+
+      let p: typeof store.pointing = null;
+
+      for (let c = 0; c < f.grid.x; c++) {
+        for (let r = 0; r < f.grid.y; r++) {
+          const startX = f.position.x + (f.padding.x + w) * c;
+          const startY = f.position.y + (f.padding.y + h) * r;
+
+          if (x >= startX && x <= startX + w && y >= startY && y <= startY + h) {
+            p = store.pointing?.framesId === f.id
+            && store.pointing.x === startX
+            && store.pointing.y === startY
+            && store.pointing.w === w
+            && store.pointing.h === h
+            ? store.pointing
+            : {
+              x: startX, y: startY, w, h, framesId: f.id
+            };
+            break;
+          }
+        }
+      }
+
+      store.pointing = p;
     }
 
     canvas.addEventListener('pointerdown', mouseDown);
@@ -380,7 +439,7 @@ function TextureDisplayer({
     <Box
       position="absolute"
       sx={{width: "100%", height: "100%"}}
-      ref={div}
+      ref={canvasContainer}
     />
     {/* I can do html elemnt overlay on canvas! Fuck yeah! */}
     {/* <Box

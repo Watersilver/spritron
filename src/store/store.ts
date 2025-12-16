@@ -74,6 +74,11 @@ type Store = {
     code: string;
   }[];
   grabbing: boolean;
+  pointing: {
+    framesId: number;
+    x: number; y: number;
+    w: number; h: number;
+  } | null;
   workArea: {
     scale: number;
     mousePos: {x: number; y: number;};
@@ -93,6 +98,7 @@ const store = proxify<Store>({
   images: [],
   frames: {},
   grabbing: false,
+  pointing: null,
   workArea: {
     scale: 1,
     mousePos: { x: 0, y: 0 },

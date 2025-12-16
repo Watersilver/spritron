@@ -5,7 +5,7 @@
 import "./libs/proxy-state/tests"
 
 
-import { Box, createTheme, CssBaseline, ThemeProvider, Typography } from "@mui/material";
+import { Box, createTheme, CssBaseline, ThemeProvider, Typography, type SxProps } from "@mui/material";
 import TextureLoader from "./components/TextureLoader/TextureLoader";
 import { useState } from "react";
 import TextureDisplayer from "./components/TextureDisplayer/TextureDisplayer";
@@ -13,7 +13,7 @@ import MenuBar from "./components/MenuBar/MenuBar";
 import store, { useWatch } from "./store/store";
 import { deproxify } from "./libs/proxy-state";
 import AnimationMenu from "./components/AnimationMenu/AnimationMenu";
-import AnimationPreview from "./components/AnimationPreview/AnimationPreview";
+import AnimationEditor from "./components/AnimationEditor/AnimationEditor";
 // import store, { useWatch } from "./store/store";
 
 const darkTheme = createTheme({
@@ -22,10 +22,14 @@ const darkTheme = createTheme({
   },
 });
 
-function CoordsTracker() {
+function CoordsTracker({
+  sx
+}: {
+  sx?: SxProps
+}) {
   const mousePos = useWatch(() => store.workArea.mousePos, () => deproxify(store.workArea.mousePos));
 
-  return <Box sx={{gridArea: 'd'}}>
+  return <Box sx={sx}>
     <Typography variant="subtitle2" color="textSecondary">
       [{Math.floor(mousePos.x)},{Math.floor(mousePos.y)}]
     </Typography>
@@ -34,6 +38,9 @@ function CoordsTracker() {
 
 function App() {
   const [theme] = useState(darkTheme);
+
+  const isAnimSelected = useWatch(() => store.selectedAnimation, () => store.selectedAnimation !== null);
+
   // const [show,setShow] = useState(true);
 
   // const {files, textures} = useSnapshot(state);
@@ -66,8 +73,8 @@ function App() {
             "a c e"
             "a b e"
             "a b e"
-            "a f e"
-            "a d e"
+            "f f f"
+            "d d d"
           `,
           gridTemplateColumns: "auto 1fr auto",
           gridTemplateRows: "auto 1fr 1fr auto auto"
@@ -86,10 +93,20 @@ function App() {
         <AnimationMenu
           sx={{gridArea: "e"}}
         />
-        <AnimationPreview
-          sx={{gridArea: "f"}}
+        {
+          isAnimSelected
+          ? <AnimationEditor
+          sx={theme => ({
+            gridArea: "f",
+            minHeight: "400px",
+            borderTop: "5px solid " + theme.palette.background.default,
+          })}
         />
-        <CoordsTracker />
+          : <Box sx={{gridArea: "f"}} />
+        }
+        <CoordsTracker
+          sx={{gridArea: "d"}}
+        />
         {/* <Box>
           <Button onClick={() => setShow(p=>!p)}>{show ? "Hide" : "Show"}</Button>
           {show ? <TextureDisplayer /> : null}

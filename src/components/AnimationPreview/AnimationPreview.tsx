@@ -12,13 +12,7 @@ function AnimationPreview({
     sx={sx}
     style={style}
   >
-    Hell no
-    <br/>
-    Thor
-    <br/>
-    won't
-    <br/>
-    GO
+    Eat my balls
   </Box>
 }
 
