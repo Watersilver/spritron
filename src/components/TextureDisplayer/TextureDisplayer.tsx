@@ -441,7 +441,7 @@ function TextureDisplayer({
       sx={{width: "100%", height: "100%"}}
       ref={canvasContainer}
     />
-    {/* I can do html elemnt overlay on canvas! Fuck yeah! */}
+    {/* I can do html element overlay on canvas! Fuck yeah! */}
     {/* <Box
       position="absolute"
       sx={{

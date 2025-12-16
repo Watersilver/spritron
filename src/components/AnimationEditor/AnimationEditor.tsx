@@ -2,7 +2,7 @@ import { Box, type SxProps, type Theme } from "@mui/material"
 import { useEffect, useRef } from "react";
 import useResource from "../../utils/useResource";
 import { autoDetectRenderer, Container } from "pixi.js";
-import AnimationPreview from "../AnimationPreview/AnimationPreview";
+// import AnimationPreview from "../AnimationPreview/AnimationPreview";
 import store from "../../store/store";
 
 // BUUUG:
