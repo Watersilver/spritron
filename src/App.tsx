@@ -13,7 +13,6 @@ import MenuBar from "./components/MenuBar/MenuBar";
 import store, { useWatch } from "./store/store";
 import { deproxify } from "./libs/proxy-state";
 import AnimationMenu from "./components/AnimationMenu/AnimationMenu";
-import AnimationEditor from "./components/AnimationEditor/AnimationEditor";
 // import store, { useWatch } from "./store/store";
 
 const darkTheme = createTheme({
@@ -39,7 +38,7 @@ function CoordsTracker({
 function App() {
   const [theme] = useState(darkTheme);
 
-  const isAnimSelected = useWatch(() => store.selectedAnimation, () => store.selectedAnimation !== null);
+  // const isAnimSelected = useWatch(() => store.selectedAnimation, () => store.selectedAnimation !== null);
 
   // const [show,setShow] = useState(true);
 
@@ -73,7 +72,6 @@ function App() {
             "a c e"
             "a b e"
             "a b e"
-            "f f f"
             "d d d"
           `,
           gridTemplateColumns: "auto 1fr auto",
@@ -93,17 +91,6 @@ function App() {
         <AnimationMenu
           sx={{gridArea: "e"}}
         />
-        {
-          isAnimSelected
-          ? <AnimationEditor
-          sx={theme => ({
-            gridArea: "f",
-            minHeight: "400px",
-            borderTop: "5px solid " + theme.palette.background.default,
-          })}
-        />
-          : <Box sx={{gridArea: "f"}} />
-        }
         <CoordsTracker
           sx={{gridArea: "d"}}
         />

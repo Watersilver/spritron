@@ -27,6 +27,9 @@ function TextureDisplayer({
       const debugCursor = new Graphics().rect(0, 0, 1, 1).fill(0xff0000);
       debugCursor.zIndex = 200;
       workArea.addChild(debugCursor);
+      const debugOrigin = new Graphics().circle(0, 0, 8).stroke(0xff00ff);
+      debugOrigin.zIndex = 155;
+      workArea.addChild(debugOrigin);
 
       const grid = new Graphics();
       grid.zIndex = 100;
@@ -37,12 +40,14 @@ function TextureDisplayer({
         stage,
         workArea,
         debugCursor,
-        grid
+        debugOrigin,
+        grid,
       };
     },
     cleanup: (scene) => {
       scene.grid.destroy();
       scene.debugCursor.destroy();
+      scene.debugOrigin.destroy();
       scene.workArea.destroy();
       scene.stage.destroy();
       scene.renderer.destroy();
