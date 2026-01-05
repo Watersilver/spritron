@@ -1,10 +1,34 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Box, Card, CardContent, Collapse, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Typography, type SxProps, type Theme } from "@mui/material"
+import { Box, Button, Card, CardContent, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Typography, useMediaQuery, useTheme, type SxProps, type Theme } from "@mui/material"
 import { Fragment, useEffect, useRef, useState } from "react";
 import store, { useWatch } from "../../store/store";
 import FramesEditor from "../FramesEditor/FramesEditor";
+import { deproxify } from '../../libs/proxy-state';
+
+
+function FileDeletionDlgContent({
+  file
+}: {
+  file: File | null
+}) {
+  if (!file) return <DialogContent>No file...</DialogContent>;
+  const f = store.frames[file.name];
+  if (!f || f.length === 0) return <DialogContent>File has no grid...</DialogContent>;
+  const anims = store.animations.filter(a => a.frames.some(f => f.image === file.name));
+  return <DialogContent>
+    {f.length > 1 ? "There are grids" : "There's a grid"} defined on this file{
+      anims.length > 0
+      ? ` and it is also used in the following animation${anims.length > 1 ? "s" : ""}: ` + anims.map(a => a.name).join(', ')
+      : ''
+    }
+    <br />
+    <br />
+    If you delete this file {(anims.length > 0 || f.length > 1) ? "they" : "it"} will be gone too
+  </DialogContent>
+}
+
 
 function TextureLoader({
   sx,
@@ -49,6 +73,9 @@ function TextureLoader({
   //   }
   // }, []);
 
+  const theme = useTheme();
+  const isMediumDown = useMediaQuery(theme.breakpoints.down('md'));
+
   const files = useWatch(() => store.files.length, () => [...store.files]);
   const imLength = useWatch(() => store.images.length, () => store.images.length);
   const selected = useWatch(() => store.selectedImage, () => store.selectedImage);
@@ -88,6 +115,17 @@ function TextureLoader({
   };
 
   const loadingImages = imLength !== files.length;
+
+  useEffect(() => {
+    const a = (e: KeyboardEvent) => {
+      if (e.key === 'a') {
+        console.log(loadingImages, files.length, imLength, deproxify(store.images));
+      }
+    };
+    document.addEventListener('keydown', a);
+
+    return () => document.removeEventListener('keydown', a);
+  }, [loadingImages, files, imLength]);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -145,7 +183,7 @@ function TextureLoader({
     const d = resizableUploadArea.current;
 
     const ro = new ResizeObserver((e) => {
-      const entry = e.find(entry => entry.target === d)
+      const entry = e.find(entry => entry.target === d);
       if (entry) {
         const size = entry.contentBoxSize.reduce((a, c) => ({
           blockSize: a.blockSize + c.blockSize,
@@ -166,6 +204,15 @@ function TextureLoader({
     };
   }, []);
 
+
+  const [fileDelData, setFileDelData] = useState<File | null>(null);
+  const deleteFile = (file: File) => {
+    const i = store.files.indexOf(file);
+    if (i === -1) return;
+    store.files.splice(i, 1);
+    delete store.frames[file.name];
+    store.animations = store.animations.filter(a => !a.frames.some(f => f.image === file.name));
+  }
 
   return <Box
     style={style}
@@ -206,6 +253,31 @@ function TextureLoader({
     //   store.selectedImage = null;
     // }}
   >
+    <Dialog
+      fullScreen={isMediumDown}
+      open={!!fileDelData}
+      onClose={() => {
+        setFileDelData(null);
+      }}
+    >
+      <DialogTitle>Delete {fileDelData?.name}?</DialogTitle>
+      <FileDeletionDlgContent file={fileDelData} />
+      <DialogActions>
+        <Button onClick={() => {
+          setFileDelData(null);
+        }}>
+          Cancel
+        </Button>
+        <Button color='error' onClick={() => {
+          setFileDelData(null);
+          if (fileDelData) {
+            deleteFile(fileDelData);
+          }
+        }}>
+          Delete
+        </Button>
+      </DialogActions>
+    </Dialog>
     <input
       type="file"
       accept="image/*"
@@ -343,7 +415,7 @@ function TextureLoader({
           </ListItemButton>
         </Collapse> */}
         {
-          files.map((file, i) => {
+          files.map((file) => {
             const isSelected = selected === file.name;
             return <Fragment key={file.name}>
               <ListItem disablePadding>
@@ -374,8 +446,11 @@ function TextureLoader({
                       transition: "opacity 0.1s"
                     }}
                     onClick={e => {
-                      store.files.splice(i, 1);
-                      delete store.frames[file.name];
+                      if (!store.frames[file.name]) {
+                        deleteFile(file);
+                      } else {
+                        setFileDelData(file);
+                      }
                       e.stopPropagation();
                     }}
                   >

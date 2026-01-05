@@ -1,4 +1,4 @@
-import { Box, IconButton, Typography, type SxProps } from "@mui/material"
+import { Box, IconButton, Typography, type Theme, type SxProps } from "@mui/material"
 import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
 import store, { useWatch } from "../../store/store";
 
@@ -10,7 +10,7 @@ import store, { useWatch } from "../../store/store";
 function MenuBar({
   sx
 }: {
-  sx?: SxProps
+  sx?: SxProps<Theme>
 }) {
 
   const bgc = useWatch(() => store.canvasColor, () => store.canvasColor);

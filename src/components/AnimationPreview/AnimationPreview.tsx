@@ -1,10 +1,10 @@
-import { Box, type SxProps } from "@mui/material"
+import { Box, type SxProps, type Theme } from "@mui/material"
 
 function AnimationPreview({
   sx,
   style
 }: {
-  sx?: SxProps
+  sx?: SxProps<Theme>
   style?: React.CSSProperties
 }) {
 

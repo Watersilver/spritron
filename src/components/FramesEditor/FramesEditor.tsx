@@ -1,8 +1,28 @@
-import { Box, Card, CardContent, Collapse, FormHelperText, IconButton, List, ListItem, ListItemButton, ListItemText, TextField, Typography, type SxProps } from "@mui/material"
+import { Box, Button, Card, CardContent, Collapse, Dialog, DialogActions, DialogTitle, FormHelperText, IconButton, List, ListItem, ListItemButton, ListItemText, TextField, Typography, type SxProps } from "@mui/material"
 import store, { useWatch } from "../../store/store";
 import { Fragment, useEffect, useState } from "react";
 import ClearIcon from '@mui/icons-material/Clear';
 import { subscribe } from "../../libs/proxy-state";
+
+type GridToBeDeleted = {id: number; name: string; image: string};
+
+// function GridDeletionDlgContent({
+//   grid
+// }: {
+//   grid: GridToBeDeleted | null
+// }) {
+//   if (!grid) return <DialogContent>No grid...</DialogContent>;
+//   const f = store.frames[grid.image];
+//   if (!f || f.length === 0) return <DialogContent>Image has no grid...</DialogContent>;
+//   const anims = store.animations.filter(a => a.frames.some(f => f.image === grid.image && f.gridId === grid.id));
+//   if (anims.length === 0) return <DialogContent>No animations...</DialogContent>;
+//   return <DialogContent>
+//     Grid is used in the following animation{anims.length > 1 ? "s" : ""}: {anims.map(a => a.name).join(', ')}
+//     <br />
+//     <br />
+//     If you delete this grid {(anims.length > 1) ? "they" : "it"} will be gone too
+//   </DialogContent>
+// }
 
 function Coords({
   frames,
@@ -352,148 +372,179 @@ function FramesEditor({
     }
   );
 
-  return <List disablePadding>
-    {
-      frames ?
-      frames.map((value) => {
-        const isSelected = image === selectedImage
-          && selectedFrames === value.id;
-        const nameClashes = frames.some(f => f.name === value.name && value !== f);
-        const emptyName = value.name === "";
-        const error = emptyName || nameClashes;
-        const hText = emptyName ? "name is empty" : nameClashes ? "duplicate name" : undefined;
+  const [gridDelData, setGridDelData] = useState<GridToBeDeleted | null>(null);
+  const deleteGrid = (g: typeof gridDelData) => {
+    if (!g) return;
+    const f = store.frames[g.image];
+    if (!f) return;
+    const i = f.findIndex(f => f.id === g.id);
+    if (i === -1) return;
+    // store.animations = store.animations.filter(a => !a.frames.some(f => f.image === g.image && f.gridId === g.id));
+    f.splice(i, 1);
+  };
 
-        return <Fragment key={value.id}>
-          <ListItem disablePadding>
-            <ListItemButton
-              selected={isSelected}
-              sx={theme => {
-                return {
-                  backgroundColor: error ? theme.palette.error.main : undefined,
-                  paddingRight: 0,
-                  paddingY: 0,
-                  "--del-op": 0,
-                  "&:hover": {
-                    "--del-op": 1
+  return <>
+    <Dialog
+      open={!!gridDelData}
+    >
+      <DialogTitle> Delete {gridDelData?.name}? </DialogTitle>
+      {/* <GridDeletionDlgContent grid={gridDelData} /> */}
+      <DialogActions>
+        <Button onClick={() => {
+          setGridDelData(null);
+        }}>
+          Cancel
+        </Button>
+        <Button color='error' onClick={() => {
+          setGridDelData(null);
+          if (gridDelData) {
+            deleteGrid(gridDelData);
+          }
+        }}>
+          Delete
+        </Button>
+      </DialogActions>
+    </Dialog>
+    <List disablePadding>
+      {
+        frames ?
+        frames.map((value) => {
+          const isSelected = image === selectedImage
+            && selectedFrames === value.id;
+          const nameClashes = frames.some(f => f.name === value.name && value !== f);
+          const emptyName = value.name === "";
+          const error = emptyName || nameClashes;
+          const hText = emptyName ? "name is empty" : nameClashes ? "duplicate name" : undefined;
+
+          return <Fragment key={value.id}>
+            <ListItem disablePadding>
+              <ListItemButton
+                selected={isSelected}
+                sx={theme => {
+                  return {
+                    backgroundColor: error ? theme.palette.error.main : undefined,
+                    paddingRight: 0,
+                    paddingY: 0,
+                    "--del-op": 0,
+                    "&:hover": {
+                      "--del-op": 1
+                    }
                   }
-                }
-              }}
-              onClick={() => {
-                if (!selectedImage) return;
-                if (store.selectedFrames === value.id) {
-                  store.selectedFrames = null;
-                } else {
-                  store.selectedFrames = value.id;
-                }
-              }}
-            >
-              <ListItemText
-                primary={
-                  isSelected
-                  // ? <TextField
-                  //   size="small"
-                  //   variant="standard"
-                  //   error={error}
-                  //   helperText={emptyName ? "name is empty" : nameClashes ? "duplicate name" : undefined}
-                  //   value={value.name}
-                  //   onChange={e => {
-                  //     if (!store.frames[image] || !store.frames[image][i]) return;
-                  //     store.frames[image][i].name = e.target.value;
-                  //   }}
-                  //   // slotProps={{
-                  //   //   htmlInput: {
-                  //   //     size: value.name.length || 1
-                  //   //   }
-                  //   // }}
-                  // />
-                  ? <Box
-                    component="span"
-                    sx={{
-                      position: "relative"
-                    }}
-                  >
-                    <Box
+                }}
+                onClick={() => {
+                  if (!selectedImage) return;
+                  if (store.selectedFrames === value.id) {
+                    store.selectedFrames = null;
+                  } else {
+                    store.selectedFrames = value.id;
+                  }
+                }}
+              >
+                <ListItemText
+                  primary={
+                    isSelected
+                    // ? <TextField
+                    //   size="small"
+                    //   variant="standard"
+                    //   error={error}
+                    //   helperText={emptyName ? "name is empty" : nameClashes ? "duplicate name" : undefined}
+                    //   value={value.name}
+                    //   onChange={e => {
+                    //     if (!store.frames[image] || !store.frames[image][i]) return;
+                    //     store.frames[image][i].name = e.target.value;
+                    //   }}
+                    //   // slotProps={{
+                    //   //   htmlInput: {
+                    //   //     size: value.name.length || 1
+                    //   //   }
+                    //   // }}
+                    // />
+                    ? <Box
                       component="span"
                       sx={{
-                        visibility: "hidden"
+                        position: "relative"
                       }}
                     >
-                      {value.name || "a"}
-                    </Box>
-                    {/* 
-                      https://css-tricks.com/auto-growing-inputs-textareas/
-                      Fucking thank you Chris Coyier
-                      For input resize trick
-                     */}
-                    <TextField
-                      size="small"
-                      variant="standard"
-                      error={error}
-                      value={value.name}
-                      onChange={e => {
-                        if (!store.frames[image]) return;
-                        const v = store.frames[image].find(f => f.id === value.id);
-                        if (!v) return;
-                        v.name = e.target.value;
-                      }}
-                      onClick={e => e.stopPropagation()}
-                      sx={{
-                        position: "absolute",
-                        left: 0,
-                        top: -4
-                      }}
-                      fullWidth
-                    />
-                    {
-                      hText
-                      ? <FormHelperText
-                        sx={{pt: 0.5}}
-                        error
+                      <Box
+                        component="span"
+                        sx={{
+                          visibility: "hidden"
+                        }}
                       >
-                        {hText}
-                      </FormHelperText>
-                      : null
-                    }
-                  </Box>
-                  : <Box
-                    component="span"
+                        {value.name || "a"}
+                      </Box>
+                      {/* 
+                        https://css-tricks.com/auto-growing-inputs-textareas/
+                        Fucking thank you Chris Coyier
+                        For input resize trick
+                      */}
+                      <TextField
+                        size="small"
+                        variant="standard"
+                        error={error}
+                        value={value.name}
+                        onChange={e => {
+                          if (!store.frames[image]) return;
+                          const v = store.frames[image].find(f => f.id === value.id);
+                          if (!v) return;
+                          v.name = e.target.value;
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        sx={{
+                          position: "absolute",
+                          left: 0,
+                          top: -4
+                        }}
+                        fullWidth
+                      />
+                      {
+                        hText
+                        ? <FormHelperText
+                          sx={{pt: 0.5}}
+                          error
+                        >
+                          {hText}
+                        </FormHelperText>
+                        : null
+                      }
+                    </Box>
+                    : <Box
+                      component="span"
+                    >
+                      {value.name}
+                    </Box>
+                  }
+                />
+                {
+                  editable
+                  ? <IconButton
+                    color="error"
+                    sx={{
+                      overflow: "hidden",
+                      opacity: "var(--del-op)",
+                      transition: "opacity 0.1s"
+                    }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      deleteGrid({id: value.id, name: value.name, image});
+                    }}
                   >
-                    {value.name}
-                  </Box>
+                    <ClearIcon />
+                  </IconButton>
+                  : null
                 }
-              />
-              {
-                editable
-                ? <IconButton
-                  color="error"
-                  sx={{
-                    overflow: "hidden",
-                    opacity: "var(--del-op)",
-                    transition: "opacity 0.1s"
-                  }}
-                  onClick={e => {
-                    e.stopPropagation();
-                    if (!store.frames[image]) return;
-                    const i = store.frames[image].findIndex(f => f.id === value.id);
-                    if (i === -1) return;
-                    store.frames[image].splice(i, 1);
-                  }}
-                >
-                  <ClearIcon />
-                </IconButton>
-                : null
-              }
-            </ListItemButton>
-          </ListItem>
-          <Collapse
-            in={isSelected}
-          >
-            <ImageFramesEditor imageName={image} framesId={value.id} />
-          </Collapse>
-        </Fragment>
-      }) : null
-    }
-  </List>
+              </ListItemButton>
+            </ListItem>
+            <Collapse
+              in={isSelected}
+            >
+              <ImageFramesEditor imageName={image} framesId={value.id} />
+            </Collapse>
+          </Fragment>
+        }) : null
+      }
+    </List>
+  </>
 }
 
 export default FramesEditor

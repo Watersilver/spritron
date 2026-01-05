@@ -1,17 +1,20 @@
-import { autoDetectRenderer, Container, FederatedPointerEvent, Graphics, Sprite } from "pixi.js";
+import { autoDetectRenderer, Container, FederatedPointerEvent, Graphics, Rectangle, Sprite, Texture } from "pixi.js";
 import { useEffect, useRef, useState } from "react";
 import useResource from "../../utils/useResource";
 import store, { ImageAsset, useWatch } from "../../store/store";
 import { Box, type SxProps, type Theme } from "@mui/material";
-
-(window as any).spriteset = new Set();
+import { deproxify } from "../../libs/proxy-state";
 
 function TextureDisplayer({
   sx,
-  style
+  style,
+  workAreaElement,
+  animFramesElement
 }: {
   sx?: SxProps<Theme>;
   style?: React.CSSProperties;
+  workAreaElement?: HTMLElement;
+  animFramesElement?: HTMLElement;
 }) {
   const canvasContainer = useRef<HTMLDivElement>(null);
 
@@ -27,28 +30,42 @@ function TextureDisplayer({
       const debugCursor = new Graphics().rect(0, 0, 1, 1).fill(0xff0000);
       debugCursor.zIndex = 200;
       workArea.addChild(debugCursor);
-      const debugOrigin = new Graphics().circle(0, 0, 8).stroke(0xff00ff);
-      debugOrigin.zIndex = 155;
-      workArea.addChild(debugOrigin);
+      const workAreaMask = new Graphics();
+      workArea.mask = workAreaMask;
+      stage.addChild(workAreaMask);
 
       const grid = new Graphics();
       grid.zIndex = 100;
       workArea.addChild(grid);
+
+      const animFramesPos = new Container();
+      stage.addChild(animFramesPos);
+      const animFrames = new Container();
+      animFramesPos.addChild(animFrames);
+      const animFramesMask = new Graphics();
+      animFrames.mask = animFramesMask;
+      stage.addChild(animFramesMask);
 
       return {
         renderer,
         stage,
         workArea,
         debugCursor,
-        debugOrigin,
+        workAreaMask,
+        animFrames,
+        animFramesMask,
+        animFramesPos,
         grid,
       };
     },
     cleanup: (scene) => {
       scene.grid.destroy();
       scene.debugCursor.destroy();
-      scene.debugOrigin.destroy();
+      scene.workAreaMask.destroy();
       scene.workArea.destroy();
+      scene.animFramesMask.destroy();
+      scene.animFrames.destroy();
+      scene.animFramesPos.destroy();
       scene.stage.destroy();
       scene.renderer.destroy();
     },
@@ -84,10 +101,48 @@ function TextureDisplayer({
 
   const selectedImageName = useWatch(() => store.selectedImage, () => store.selectedImage);
 
+
+  const animations = useWatch(() => store.animations, () => deproxify(store.animations));
+  const selectedAnimation = useWatch(() => store.selectedAnimation, () => store.selectedAnimation);
+
+  // Create animation frames
+  useEffect(() => {
+    if (!scene) return;
+    const a = animations.find(a => a.id === selectedAnimation);
+    if (!a) return;
+
+    const resources: [Sprite, Texture][] = [];
+    for (const f of a.frames) {
+      const source = store.images.find(i => i.file.name === f.image)?.texture.source;
+      if (!source) continue;
+      const t = new Texture({
+        source,
+        frame: new Rectangle(...f.bounds)
+      });
+      const s = new Sprite(t);
+      resources.push([s,t]);
+    }
+    const newAnimFrames = resources.map(r => r[0]);
+    for (const anim of newAnimFrames) {
+      scene.animFrames.addChild(anim);
+    }
+
+    return () => {
+      for (const r of resources) {
+        r[0].removeFromParent();
+        r[0].destroy();
+        r[1].destroy();
+      }
+    };
+  }, [animations, selectedAnimation, scene]);
+
+
+
   const [selectedSpritesheetSprite, setSelectedSpritesheetSprite] = useState<(Sprite & {
     image: ImageAsset;
   }) | null>(null);
 
+  // Set selected spritesheet
   useEffect(() => {
     if (!scene) {
       setSelectedSpritesheetSprite(null);
@@ -102,6 +157,7 @@ function TextureDisplayer({
     setSelectedSpritesheetSprite(Object.assign(newSpr, {image}));
   }, [images, scene, selectedImageName]);
 
+  // Add selected spritesheet to scene tree
   useEffect(() => {
     if (!selectedSpritesheetSprite) return;
     if (scene) {
@@ -113,6 +169,7 @@ function TextureDisplayer({
     };
   }, [selectedSpritesheetSprite, scene]);
 
+  // Clean previous selected spritesheet
   useEffect(() => {
     return () => {
       if (selectedSpritesheetSprite && !selectedSpritesheetSprite.parent) {
@@ -132,16 +189,80 @@ function TextureDisplayer({
     }
   }, [scene]);
 
+  // Reposition canvas areas since we have a single canvas that must fit a css grid
+  const prev = useRef({x: 0, y: 0});
+  useEffect(() => {
+    if (!workAreaElement || !scene) return;
+
+    const ro = new ResizeObserver((e) => {
+      const entry = e.find(entry => entry.target === workAreaElement);
+      if (entry) {
+        const rect = workAreaElement.getBoundingClientRect();
+        const diffX = rect.x - prev.current.x;
+        const diffY = rect.y - prev.current.y;
+        prev.current.x = rect.x;
+        prev.current.y = rect.y;
+        store.workArea.pos.x += diffX;
+        store.workArea.pos.y += diffY;
+
+        const size = entry.contentBoxSize.reduce((a, c) => ({
+          blockSize: a.blockSize + c.blockSize,
+          inlineSize: a.inlineSize + c.inlineSize
+        }), {blockSize: 0, inlineSize: 0});
+        scene.workAreaMask.clear();
+        scene.workAreaMask
+        .rect(rect.x, rect.y, size.inlineSize, size.blockSize)
+        .fill(0xffffff);
+      }
+    });
+
+    // Callback gets called when observing starts
+    ro.observe(workAreaElement);
+
+    return () => {
+      ro.disconnect();
+    };
+  }, [workAreaElement, scene]);
+
+  useEffect(() => {
+    if (!animFramesElement || !scene) return;
+
+    const ro = new ResizeObserver((e) => {
+      const entry = e.find(entry => entry.target === animFramesElement);
+      if (entry) {
+        const rect = animFramesElement.getBoundingClientRect();
+        scene.animFramesPos.x = rect.x;
+        scene.animFramesPos.y = rect.y;
+
+        const size = entry.contentBoxSize.reduce((a, c) => ({
+          blockSize: a.blockSize + c.blockSize,
+          inlineSize: a.inlineSize + c.inlineSize
+        }), {blockSize: 0, inlineSize: 0});
+        scene.animFramesMask.clear();
+        scene.animFramesMask
+        .rect(rect.x, rect.y, size.inlineSize, size.blockSize)
+        .fill(0xffffff);
+      }
+    });
+
+    // Callback gets called when observing starts
+    ro.observe(animFramesElement);
+
+    return () => {
+      ro.disconnect();
+    };
+  }, [animFramesElement, scene]);
+
+
   const rerenderGrid = useRef(false);
 
-  // const test =
   useWatch(
     [
       () => store.workArea.scale,
       () => store.workArea.pos,
       () => store.selectedFrames,
       () => store.selectedImage,
-      () => store.pointing,
+      () => store.workArea.pointing,
       () => store.frames // Suboptimal but who cares? I don't.
     ],
     () => {
@@ -198,6 +319,7 @@ function TextureDisplayer({
         debugCursor.position.y = Math.floor(mp.y);
 
 
+        // Grid graphics build code
         if (rerenderGrid.current) {
           rerenderGrid.current = false;
           if (
@@ -265,9 +387,9 @@ function TextureDisplayer({
                   .stroke({pixelLine: true, color: 0xff0000});
 
                   if (
-                    f.id === store.pointing?.framesId
-                    && startX === store.pointing.x
-                    && startY === store.pointing.y
+                    f.id === store.workArea.pointing?.framesId
+                    && startX === store.workArea.pointing.x
+                    && startY === store.workArea.pointing.y
                   ) {
                     grid.blendMode = 'multiply';
                     grid.fill({color: 0xffffff, alpha: 0.25});
@@ -304,49 +426,161 @@ function TextureDisplayer({
         }
 
 
-        if (store.grabbing) {
+        if (store.workArea.grabbing || store.animFrames.grabbing) {
           // document.body.style.cursor = 'grab';
           document.body.style.cursor = 'grabbing';
-        } else if (store.pointing) {
+        } else if (store.workArea.pointing) {
           document.body.style.cursor = 'pointer';
         } else {
           document.body.style.cursor = 'auto';
         }
 
-        renderer.render({
-          container: stage,
-          clear: true,
-          clearColor: store.canvasColor
-        });
+
+        // Animation frames container positioning
+        const frames = scene.animFrames.children;
+        const tallest = frames.reduce((a,c) => c.height > a ? c.height : a, 0);
+        const sa = store.selectedAnimation;
+        const anim = store.animations.find(a => a.id === sa);
+        if (sa !== null && anim) {
+          if (tallest > 0) {
+            if (animFramesElement && !store.animFrames.transforms[sa]) {
+              const {height} = animFramesElement.getBoundingClientRect();
+              store.animFrames.transforms[sa] = {
+                scale: height / (tallest + anim.padding * 2),
+                pos: {x: 0, y: 0}
+              };
+
+              const t = store.animFrames.transforms[sa];
+              const scAnFr = scene.animFrames;
+
+              scAnFr.x = t.pos.x;
+              scAnFr.y = t.pos.y;
+              scAnFr.scale = t.scale;
+            } else {
+              const t = store.animFrames.transforms[sa];
+              if (t) {
+                const scAnFr = scene.animFrames;
+
+                scAnFr.x = t.pos.x;
+                scAnFr.y = t.pos.y;
+
+                if (scAnFr.scale.x !== t.scale) {
+                  const ratio = t.scale/scAnFr.scale.x;
+                  const oldMousePos = scAnFr.toLocal(store.mousePos);
+                  const newMousePos = oldMousePos.clone();
+                  newMousePos.x /= ratio;
+                  newMousePos.y /= ratio;
+
+                  let diff = newMousePos.clone();
+                  diff.x -= oldMousePos.x;
+                  diff.y -= oldMousePos.y;
+
+                  diff.x *= t.scale;
+                  diff.y *= t.scale;
+
+                  t.pos.x += diff.x;
+                  t.pos.y += diff.y;
+                  scAnFr.position = t.pos;
+
+                  scAnFr.scale = t.scale;
+                }
+              }
+            }
+          } else {
+            // Reset when deleting all frames
+            delete store.animFrames.transforms[sa];
+          }
+        }
+
+        // Individual animation frames placement
+        if (anim) {
+          const widest = frames.reduce((a,c) => c.width > a ? c.width : a, 0);
+          for (let i = 0; i < frames.length; i++) {
+            const f = frames[i];
+            if (!f || !f.parent) continue;
+            const col = i % anim.columnLimit;
+            const row = Math.floor(i / anim.columnLimit);
+            f.x = col * (widest + anim.padding) + anim.padding;
+            f.y = row * (tallest + anim.padding) + anim.padding;
+          }
+        }
+
+
+        try {
+          renderer.render({
+            container: stage,
+            clear: true,
+            clearColor: store.canvasColor
+          });
+        } catch (e) {
+          console.error(e);
+        }
 
         id = requestAnimationFrame(render);
       }
     }
 
+
     id = requestAnimationFrame(render);
 
     return () => cancelAnimationFrame(id);
-  }, [scene]);
+  }, [scene, animFramesElement]);
 
   // Logic
   useEffect(() => {
     const canvas = scene?.renderer.canvas;
     if (!canvas) return;
 
-    const grab = () => {
-      store.grabbing = true;
+    const grab = (el: HTMLElement) => {
+      if (el === workAreaElement) {
+        store.workArea.grabbing = true;
+      } else {
+        store.animFrames.grabbing = true;
+      }
     }
 
     const ungrab = () => {
-      store.grabbing = false;
+      store.workArea.grabbing = false;
+      store.animFrames.grabbing = false;
+    }
+
+    const isInElement = (e: PointerEvent | WheelEvent, el: HTMLElement | undefined): el is HTMLElement => {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      if (r.x > e.x || r.x + r.width < e.x) return false;
+      if (r.y > e.y || r.y + r.height < e.y) return false;
+      return true;
     }
 
     const mouseDown = async (e: PointerEvent) => {
       const d = canvasContainer.current;
       if (!d) return;
 
-      if (e.button === 1) {
-        grab();
+      if (isInElement(e, workAreaElement)) {
+        if (e.button === 0) {
+          if (store.workArea.pointing && store.selectedAnimation !== null) {
+            const a = store.animations.find(a => a.id === store.selectedAnimation);
+            if (a) {
+              const image = store.files.find(f => f.name === Object.entries(store.frames).find(([_, data]) => data.some(d => d.id === store.workArea.pointing?.framesId))?.[0])?.name;
+              if (image !== undefined) {
+                a.frames.push({
+                  image,
+                  durationFactor: 1,
+                  anchor: {x: store.workArea.pointing.x + store.workArea.pointing.w * 0.5, y: store.workArea.pointing.y + store.workArea.pointing.h * 0.5},
+                  bounds: [store.workArea.pointing.x, store.workArea.pointing.y, store.workArea.pointing.w, store.workArea.pointing.h],
+                });
+              }
+            }
+          }
+        } else if (e.button === 1) {
+          grab(workAreaElement);
+        }
+      }
+
+      if (isInElement(e, animFramesElement)) {
+        if (e.button === 1) {
+          grab(animFramesElement);
+        }
       }
     }
 
@@ -360,14 +594,33 @@ function TextureDisplayer({
     }
 
     const mouseMove = (e: PointerEvent) => {
-      if (store.grabbing) {
+      if (store.workArea.grabbing) {
         store.workArea.pos.x += e.movementX;
         store.workArea.pos.y += e.movementY;
+      } else if (store.animFrames.grabbing) {
+        const sa = store.selectedAnimation;
+        if (sa !== null) {
+          const t = store.animFrames.transforms[sa];
+          if (t) {
+            t.pos.x += e.movementX;
+            t.pos.y += e.movementY;
+          }
+        }
       }
     }
 
     const wheel = (e: WheelEvent) => {
-      store.workArea.scale -= Math.sign(e.deltaY) * store.workArea.scale * 0.1;
+      if (isInElement(e, workAreaElement)) {
+        store.workArea.scale -= Math.sign(e.deltaY) * store.workArea.scale * 0.1;
+      } else if (isInElement(e, animFramesElement)) {
+        const sa = store.selectedAnimation;
+        if (sa !== null) {
+          const t = store.animFrames.transforms[sa];
+          if (t) {
+            t.scale -= Math.sign(e.deltaY) * t.scale * 0.1;
+          }
+        }
+      }
     }
 
     const mouseMoveWorkArea = (e: FederatedPointerEvent) => {
@@ -376,24 +629,40 @@ function TextureDisplayer({
       const {x, y} = e.getLocalPosition(scene.workArea);
 
       if (!scene.renderer.canvas.matches(":hover")) {
-        store.pointing = null;
+        store.workArea.pointing = null;
         return;
       }
 
+      
+      if (!workAreaElement) {
+        store.workArea.pointing = null;
+        return;
+      }
+
+      const r = workAreaElement.getBoundingClientRect();
+      if (
+        r.x > e.x || r.x + r.width < e.x
+        || r.y > e.y || r.y + r.height < e.y
+      ) {
+        store.workArea.pointing = null;
+        return;
+      }
+
+
       if (!store.selectedImage || store.selectedAnimation === null) {
-        store.pointing = null;
+        store.workArea.pointing = null;
         return;
       }
       const f = store.frames[store.selectedImage]?.find(f => f.id === store.selectedFrames);
       if (!f) {
-        store.pointing = null;
+        store.workArea.pointing = null;
         return;
       }
 
       const w = f.dimensions.x;
       const h = f.dimensions.y;
 
-      let p: typeof store.pointing = null;
+      let p: typeof store.workArea.pointing = null;
 
       for (let c = 0; c < f.grid.x; c++) {
         for (let r = 0; r < f.grid.y; r++) {
@@ -401,12 +670,12 @@ function TextureDisplayer({
           const startY = f.position.y + (f.padding.y + h) * r;
 
           if (x >= startX && x <= startX + w && y >= startY && y <= startY + h) {
-            p = store.pointing?.framesId === f.id
-            && store.pointing.x === startX
-            && store.pointing.y === startY
-            && store.pointing.w === w
-            && store.pointing.h === h
-            ? store.pointing
+            p = store.workArea.pointing?.framesId === f.id
+            && store.workArea.pointing.x === startX
+            && store.workArea.pointing.y === startY
+            && store.workArea.pointing.w === w
+            && store.workArea.pointing.h === h
+            ? store.workArea.pointing
             : {
               x: startX, y: startY, w, h, framesId: f.id
             };
@@ -415,7 +684,7 @@ function TextureDisplayer({
         }
       }
 
-      store.pointing = p;
+      store.workArea.pointing = p;
     }
 
     canvas.addEventListener('pointerdown', mouseDown);
@@ -431,7 +700,7 @@ function TextureDisplayer({
       canvas.removeEventListener('wheel', wheel);
       scene.workArea.off('globalpointermove', mouseMoveWorkArea);
     }
-  }, [scene]);
+  }, [scene, workAreaElement, animFramesElement]);
 
   return <Box
     position="relative"

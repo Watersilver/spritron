@@ -1,4 +1,4 @@
-import { Autocomplete, Box, Card, CardContent, Checkbox, Collapse, FormControlLabel, FormHelperText, List, ListItemButton, ListItemIcon, ListItemText, TextField, Typography, type SxProps } from "@mui/material";
+import { Autocomplete, Box, Card, CardContent, Checkbox, Collapse, FormControlLabel, FormHelperText, List, ListItemButton, ListItemIcon, ListItemText, TextField, Tooltip, Typography, type SxProps, type Theme } from "@mui/material";
 import AddIcon from '@mui/icons-material/Add';
 import store, { useWatch } from "../../store/store";
 import { deproxify } from "../../libs/proxy-state";
@@ -8,7 +8,7 @@ function AnimationMenu({
   sx,
   style
 }: {
-  sx?: SxProps
+  sx?: SxProps<Theme>
   style?: React.CSSProperties
 }) {
   const animations = useWatch(() => store.animations, () => deproxify(store.animations));
@@ -137,7 +137,8 @@ function AnimationMenu({
                       <Box
                         sx={{
                           display: "grid",
-                          gridTemplateColumns: '1fr 1fr'
+                          gridTemplateColumns: '1fr 1fr',
+                          rowGap: 1
                         }}
                       >
                         <TextField
@@ -155,6 +156,42 @@ function AnimationMenu({
                             }
                           }}
                           label={"FPS"}
+                        />
+                        <Tooltip
+                          title="How many columns there are before it wraps"
+                        >
+                          <TextField
+                            value={a.columnLimit}
+                            size="small"
+                            sx={{width: "5em"}}
+                            onChange={e => {
+                              const anim = store.animations.find(an => an.id === a.id);
+                              if (!anim) return;
+                              const v = Number(e.target.value);
+                              if (Number.isNaN(v) || !Number.isFinite(v) || v < 1) {
+                                anim.columnLimit = 1;
+                              } else {
+                                anim.columnLimit = v;
+                              }
+                            }}
+                            label={"Columns"}
+                          />
+                        </Tooltip>
+                        <TextField
+                          value={a.padding}
+                          size="small"
+                          sx={{width: "5em"}}
+                          onChange={e => {
+                            const anim = store.animations.find(an => an.id === a.id);
+                            if (!anim) return;
+                            const v = Number(e.target.value);
+                            if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
+                              anim.padding = 1;
+                            } else {
+                              anim.padding = v;
+                            }
+                          }}
+                          label={"Padding"}
                         />
                         <Autocomplete
                           sx={{width: "5em"}}
@@ -235,7 +272,9 @@ function AnimationMenu({
                   id: store.nextAnimationId,
                   fps: 24,
                   name: "animation_" + i,
-                  frames: []
+                  frames: [],
+                  padding: 0,
+                  columnLimit: 20
                 });
                 store.selectedAnimation = store.nextAnimationId;
                 store.nextAnimationId++;
