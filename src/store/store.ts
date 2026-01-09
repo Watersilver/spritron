@@ -1,5 +1,5 @@
 import { Texture } from "pixi.js";
-import { proxify, subscribe, createReactHook } from "../libs/proxy-state";
+import { proxify, subscribe, createReactHook, deproxify } from "../libs/proxy-state";
 import { useEffect, useState } from "react";
 
 class ImageAsset {
@@ -55,7 +55,7 @@ type Store = {
       durationFactor: number;
       /** The actual part of the texture this frame uses */
       bounds: [x: number, y: number, w: number, h: number];
-      anchor: {x: number; y: number;};
+      offset: {x: number; y: number;};
       colorTransform?: ColorTransform;
       transfrom?: Transform;
     }[];
@@ -99,10 +99,16 @@ type Store = {
   selectedImage: string | null;
   selectedFrames: number | null;
   selectedAnimation: number | null;
+  selectedAnimFrames: {[animId: number]: number};
   mousePos: {x: number; y: number;};
   nextFramesId: number;
   nextAnimationId: number;
-  canvasColor: string;
+  colours: {
+    canvas: string;
+    selectedFrame: string;
+    margin: string;
+    guides: string;
+  }
 };
 
 const store = proxify<Store>({
@@ -125,11 +131,24 @@ const store = proxify<Store>({
   selectedImage: null,
   selectedFrames: null,
   selectedAnimation: null,
+  selectedAnimFrames: {},
   mousePos: {x: 0, y: 0},
   nextFramesId: 0,
   nextAnimationId: 0,
-  canvasColor: localStorage.getItem("canvasColor") ?? "#000",
+  colours: {
+    canvas: "#000",
+    selectedFrame: "#f00",
+    margin: "#A464CB",
+    guides: "#0f0",
+  }
 });
+// Initialize colours
+for (const c of (Object.keys(store.colours) as unknown as (keyof typeof store["colours"])[])) {
+  const stored = localStorage.getItem(c + "Colour");
+  if (stored !== null) {
+    store.colours[c] = stored;
+  }
+}
 
 // This horrible thing need to exist because of the await of createImageBitmap that introduces
 // weird race conditions. If files length changes via push it runs a lot of times and fucks everything up.
@@ -187,6 +206,11 @@ subscribe(() => store.files.length, async () => {
 });
 
 subscribe(() => store.animations.length, () => {
+  const safIds = Object.keys(store.selectedAnimFrames).map(i => Number(i));
+  const orphans = safIds.filter(s => !store.animations.some(a => a.id === s));
+  for (const o of orphans) {
+    delete store.selectedAnimFrames[o];
+  }
   if (store.selectedAnimation === null) return;
   if (store.animations.find(a => a.id === store.selectedAnimation)) return;
   store.selectedAnimation = null;
@@ -307,8 +331,14 @@ subscribe(() => store.animations.length, () => {
 //   }
 // });
 
-subscribe(() => store.canvasColor, () => {
-  localStorage.setItem("canvasColor", store.canvasColor);
+let prevColours = deproxify(store.colours);
+subscribe(() => store.colours, () => {
+  for (const c of (Object.keys(store.colours) as unknown as (keyof typeof store["colours"])[])) {
+    if (store.colours[c] !== prevColours[c]) {
+      localStorage.setItem(c + "Colour", store.colours[c]);
+    }
+  }
+  prevColours = deproxify(store.colours);
 });
 
 const useWatch = createReactHook(useEffect, useState);

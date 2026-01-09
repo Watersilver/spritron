@@ -13,7 +13,7 @@ function MenuBar({
   sx?: SxProps<Theme>
 }) {
 
-  const bgc = useWatch(() => store.canvasColor, () => store.canvasColor);
+  const bgc = useWatch(() => store.colours.canvas, () => store.colours.canvas);
 
   return <Box sx={sx}>
     <Box
@@ -36,7 +36,7 @@ function MenuBar({
           type="color"
           value={bgc}
           onChange={e => {
-            store.canvasColor = e.target.value;
+            store.colours.canvas = e.target.value;
           }}
           style={{
             borderRadius: 0,

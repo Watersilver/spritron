@@ -1,8 +1,9 @@
-import { Autocomplete, Box, Card, CardContent, Checkbox, Collapse, FormControlLabel, FormHelperText, List, ListItemButton, ListItemIcon, ListItemText, TextField, Tooltip, Typography, type SxProps, type Theme } from "@mui/material";
+import { Autocomplete, Box, Card, CardContent, Checkbox, Collapse, FormControlLabel, FormHelperText, IconButton, List, ListItemButton, ListItemIcon, ListItemText, TextField, Tooltip, Typography, type SxProps, type Theme } from "@mui/material";
 import AddIcon from '@mui/icons-material/Add';
 import store, { useWatch } from "../../store/store";
 import { deproxify } from "../../libs/proxy-state";
 import { Fragment } from "react";
+import ClearIcon from '@mui/icons-material/Clear';
 
 function AnimationMenu({
   sx,
@@ -114,6 +115,22 @@ function AnimationMenu({
                     </Box>
                   }
                 />
+                {
+                  <IconButton
+                    color="error"
+                    sx={{
+                      overflow: "hidden",
+                      opacity: "var(--del-op)",
+                      transition: "opacity 0.1s"
+                    }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      store.animations = store.animations.filter(an => an.id !== a.id);
+                    }}
+                  >
+                    <ClearIcon />
+                  </IconButton>
+                }
               </ListItemButton>
               <Collapse
                 in={isSelected}
@@ -203,7 +220,7 @@ function AnimationMenu({
                             if (!anim) return;
                             if (!anim.transfrom) anim.transfrom = {};
                             if (v === 90 || v === 180 || v === 270) anim.transfrom.rotation = v;
-                            else delete anim.transfrom;
+                            else delete anim.transfrom.rotation;
                           }}
                           disablePortal
                           disableClearable
@@ -214,6 +231,48 @@ function AnimationMenu({
                           getOptionLabel={v => {
                             return v + "°";
                           }}
+                        />
+                        <FormControlLabel
+                          sx={{mr: 0}}
+                          control={
+                            <Checkbox
+                              value={a.transfrom?.mirror?.x ?? false}
+                              onChange={(_, c) => {
+                                const anim = store.animations.find(an => an.id === a.id);
+                                if (!anim) return;
+                                anim.transfrom = anim.transfrom ?? {};
+                                anim.transfrom.mirror = anim.transfrom.mirror ?? {x: false, y: false};
+                                anim.transfrom.mirror.x = c;
+                              }}
+                              size="small"
+                            />
+                          }
+                          label={
+                            <Typography variant="subtitle2" color="textSecondary">
+                              Mirror
+                            </Typography>
+                          }
+                        />
+                        <FormControlLabel
+                          sx={{mr: 0}}
+                          control={
+                            <Checkbox
+                              value={a.transfrom?.mirror?.y ?? false}
+                              onChange={(_, c) => {
+                                const anim = store.animations.find(an => an.id === a.id);
+                                if (!anim) return;
+                                anim.transfrom = anim.transfrom ?? {};
+                                anim.transfrom.mirror = anim.transfrom.mirror ?? {x: false, y: false};
+                                anim.transfrom.mirror.y = c;
+                              }}
+                              size="small"
+                            />
+                          }
+                          label={
+                            <Typography variant="subtitle2" color="textSecondary">
+                              Flip
+                            </Typography>
+                          }
                         />
                         <FormControlLabel
                           sx={{mr: 0}}

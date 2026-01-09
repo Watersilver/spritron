@@ -13,6 +13,7 @@ import MenuBar from "./components/MenuBar/MenuBar";
 import store, { useWatch } from "./store/store";
 import { deproxify } from "./libs/proxy-state";
 import AnimationMenu from "./components/AnimationMenu/AnimationMenu";
+import FrameOptions from "./components/FrameOptions/FrameOptions";
 // import store, { useWatch } from "./store/store";
 
 const darkTheme = createTheme({
@@ -142,7 +143,7 @@ function App() {
               pointerEvents: "auto"
             })}
           /> : null}
-          {isAnimSelected ? <Box
+          {/* {isAnimSelected ? <Box
             sx={{
               gridArea: "g",
               minHeight: animFramesHeight + "vh"
@@ -152,7 +153,36 @@ function App() {
                 setAnimFramesElement(e);
               }
             }}
-          /> : null}
+          /> : null} */}
+          {isAnimSelected ? <Box
+            sx={{
+              gridArea: "g",
+              minHeight: animFramesHeight + "vh",
+              // TODO? frame options only appear when frame is selected
+              display: "grid",
+              gridTemplateAreas: `"frame-options animation-frames animation-preview"`,
+              gridTemplateColumns: "auto 1fr auto"
+            }}
+          >
+            <FrameOptions
+              sx={{
+                gridArea: "frame-options",
+                pointerEvents: "auto"
+              }}
+            />
+            <Box
+              sx={{gridArea: "animation-frames"}}
+              ref={(e) => {
+                if (e instanceof HTMLElement) {
+                  setAnimFramesElement(e);
+                }
+              }}
+            />
+            {/* TODO */}
+            <Box
+              sx={{gridArea: "animation-preview"}}
+            />
+          </Box> : null}
           <CoordsTracker
             sx={theme => ({
               gridArea: "d",

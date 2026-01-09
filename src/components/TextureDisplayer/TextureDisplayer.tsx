@@ -1,9 +1,61 @@
-import { autoDetectRenderer, Container, FederatedPointerEvent, Graphics, Rectangle, Sprite, Texture } from "pixi.js";
+import { autoDetectRenderer, Container, FederatedPointerEvent, Graphics, Rectangle, Sprite, Texture, type ColorSource } from "pixi.js";
 import { useEffect, useRef, useState } from "react";
 import useResource from "../../utils/useResource";
 import store, { ImageAsset, useWatch } from "../../store/store";
 import { Box, type SxProps, type Theme } from "@mui/material";
 import { deproxify } from "../../libs/proxy-state";
+
+function createDashedLine(
+  g: Graphics, color: ColorSource,
+  start: {x: number; y: number;},
+  end: {x: number; y: number;},
+  gapLength: number, lineLength = gapLength
+) {
+  const gl = gapLength;
+  const ll = lineLength;
+
+  const sp = {x: start.x, y: start.y};
+  const v = {x: end.x - start.x, y: end.y - start.y};
+  const magn = Math.sqrt(v.x ** 2 + v.y ** 2);
+  const direction = {x: v.x / magn, y: v.y / magn};
+
+  for (let d = 0; d < magn; d += gl + ll) {
+    g.moveTo(
+      sp.x + direction.x * (ll + d),
+      sp.y + direction.y * (ll + d)
+    );
+    g.lineTo(
+      sp.x + direction.x * (gl + ll + d),
+      sp.y + direction.y * (gl + ll + d)
+    );
+  }
+
+  g.stroke({color, pixelLine: true});
+}
+
+const boundedRect = (
+  g: Graphics,
+  topLeft: {x: number; y: number},
+  bottomRight: {x: number; y: number},
+  x: number, y: number,
+  w: number, h: number,
+  padding = 0.01
+) => {
+  const boundedX = Math.max(topLeft.x, x);
+  const boundedY = Math.max(topLeft.y, y);
+  const truncatedW = w + x - boundedX;
+  const truncatedH = h + y - boundedY;
+
+  const finalW = truncatedW - Math.max(0, boundedX + truncatedW - bottomRight.x);
+  const finalH = truncatedH - Math.max(0, boundedY + truncatedH - bottomRight.y);
+
+  return g.rect(
+    boundedX + padding,
+    boundedY + padding,
+    finalW - padding * 2,
+    finalH - padding * 2
+  );
+}
 
 function TextureDisplayer({
   sx,
@@ -38,13 +90,18 @@ function TextureDisplayer({
       grid.zIndex = 100;
       workArea.addChild(grid);
 
+
       const animFramesPos = new Container();
       stage.addChild(animFramesPos);
       const animFrames = new Container();
       animFramesPos.addChild(animFrames);
       const animFramesMask = new Graphics();
-      animFrames.mask = animFramesMask;
+      animFramesPos.mask = animFramesMask;
       stage.addChild(animFramesMask);
+
+      const animFramesGraphics = new Graphics();
+      animFramesGraphics.zIndex = 100;
+      animFramesPos.addChild(animFramesGraphics);
 
       return {
         renderer,
@@ -55,6 +112,7 @@ function TextureDisplayer({
         animFrames,
         animFramesMask,
         animFramesPos,
+        animFramesGraphics,
         grid,
       };
     },
@@ -65,6 +123,7 @@ function TextureDisplayer({
       scene.workArea.destroy();
       scene.animFramesMask.destroy();
       scene.animFrames.destroy();
+      scene.animFramesGraphics.destroy();
       scene.animFramesPos.destroy();
       scene.stage.destroy();
       scene.renderer.destroy();
@@ -284,6 +343,7 @@ function TextureDisplayer({
     let id: number;
 
     const render = () => {
+      if (!workAreaElement) return;
       if (!stage.destroyed) {
         // workArea.rotation += 0.01;
 
@@ -337,10 +397,17 @@ function TextureDisplayer({
             if (f) {
               grid.moveTo(0, 0);
 
+              const {
+                x: waX,
+                y: waY,
+                width: waWidth,
+                height: waHeight
+              } = workAreaElement.getBoundingClientRect();
+
               // Global measurements converted to local
-              const ls = scene.workArea.toLocal({x: 0, y: 0});
-              const lw = scene.renderer.canvas.width / scene.workArea.scale.x;
-              const lh = scene.renderer.canvas.height / scene.workArea.scale.y;
+              const ls = scene.workArea.toLocal({x: waX, y: waY});
+              const lw = waWidth / scene.workArea.scale.x;
+              const lh = waHeight / scene.workArea.scale.y;
               const le = {x: ls.x + lw, y: ls.y + lh};
 
               grid.rect(ls.x, ls.y, lw, lh).fill({color: 0x000000, alpha: 0.5});
@@ -370,10 +437,10 @@ function TextureDisplayer({
                   if (effectiveW <= 0 || effectiveH <= 0) continue;
 
                   grid.rect(
-                    effectiveStartX,
-                    effectiveStartY,
-                    effectiveW,
-                    effectiveH
+                    effectiveStartX + 0.01,
+                    effectiveStartY + 0.01,
+                    effectiveW - 0.02,
+                    effectiveH - 0.02
                   ).cut();
                 }
               }
@@ -384,7 +451,7 @@ function TextureDisplayer({
                   const startY = f.position.y + (f.padding.y + h) * r;
 
                   grid.rect(startX, startY, w, h)
-                  .stroke({pixelLine: true, color: 0xff0000});
+                  .stroke({pixelLine: true, color: store.colours.selectedFrame});
 
                   if (
                     f.id === store.workArea.pointing?.framesId
@@ -399,28 +466,30 @@ function TextureDisplayer({
               }
 
               const dist = 16 / store.workArea.scale;
-
-              let y = f.position.y;
-              for (let x = Math.floor(ls.x / dist) * dist; x < ls.x + lw; x += dist) {
-                grid.moveTo(x + dist * 0.5, y);
-                grid.lineTo(x + dist, y);
-              }
-              y = y + f.dimensions.y + (f.grid.y - 1) * (f.dimensions.y + f.padding.y);
-              for (let x = Math.floor(ls.x / dist) * dist; x < ls.x + lw; x += dist) {
-                grid.moveTo(x + dist * 0.5, y);
-                grid.lineTo(x + dist, y);
-              }
-              let x = f.position.x;
-              for (let y = Math.floor(ls.y / dist) * dist; y < ls.y + lh; y += dist) {
-                grid.moveTo(x, y + dist * 0.5);
-                grid.lineTo(x, y + dist);
-              }
-              x = x + f.dimensions.x + (f.grid.x - 1) * (f.dimensions.x + f.padding.x);
-              for (let y = Math.floor(ls.y / dist) * dist; y < ls.y + lh; y += dist) {
-                grid.moveTo(x, y + dist * 0.5);
-                grid.lineTo(x, y + dist);
-              }
-              grid.stroke({color: 0x00ff00, pixelLine: true});
+              createDashedLine(
+                grid, store.colours.guides,
+                {x: Math.floor(ls.x / dist) * dist, y: f.position.y},
+                {x: Math.floor((ls.x + lw) / dist) * dist, y: f.position.y},
+                dist * 0.5
+              );
+              createDashedLine(
+                grid, store.colours.guides,
+                {x: Math.floor(ls.x / dist) * dist, y: f.position.y + f.dimensions.y + (f.grid.y - 1) * (f.dimensions.y + f.padding.y)},
+                {x: Math.floor((ls.x + lw) / dist) * dist, y: f.position.y + f.dimensions.y + (f.grid.y - 1) * (f.dimensions.y + f.padding.y)},
+                dist * 0.5
+              );
+              createDashedLine(
+                grid, store.colours.guides,
+                {x: f.position.x, y: Math.floor(ls.y / dist) * dist},
+                {x: f.position.x, y: Math.floor((ls.y + lh) / dist) * dist},
+                dist * 0.5
+              );
+              createDashedLine(
+                grid, store.colours.guides,
+                {x: f.position.x + f.dimensions.x + (f.grid.x - 1) * (f.dimensions.x + f.padding.x), y: Math.floor(ls.y / dist) * dist},
+                {x: f.position.x + f.dimensions.x + (f.grid.x - 1) * (f.dimensions.x + f.padding.x), y: Math.floor((ls.y + lh) / dist) * dist},
+                dist * 0.5
+              );
             }
           }
         }
@@ -437,10 +506,16 @@ function TextureDisplayer({
 
 
         // Animation frames container positioning
-        const frames = scene.animFrames.children;
-        const tallest = frames.reduce((a,c) => c.height > a ? c.height : a, 0);
         const sa = store.selectedAnimation;
         const anim = store.animations.find(a => a.id === sa);
+        const frames = scene.animFrames.children;
+        const tallest = frames.reduce((a,c,i) => {
+          const f = anim?.frames[i];
+          let r = anim?.transfrom?.rotation ?? 0;
+          r += f?.transfrom?.rotation ?? 0;
+          const h = (r === 90 || r === 270 ? c.width : c.height) + (f?.offset.y ?? 0);
+          return h > a ? h : a;
+        }, 0);
         if (sa !== null && anim) {
           if (tallest > 0) {
             if (animFramesElement && !store.animFrames.transforms[sa]) {
@@ -490,18 +565,181 @@ function TextureDisplayer({
             // Reset when deleting all frames
             delete store.animFrames.transforms[sa];
           }
-        }
 
-        // Individual animation frames placement
-        if (anim) {
-          const widest = frames.reduce((a,c) => c.width > a ? c.width : a, 0);
+
+          // Individual animation frames placement
+          const widest = frames.reduce((a,c,i) => {
+            const f = anim.frames[i];
+            let r = anim.transfrom?.rotation ?? 0;
+            r += f?.transfrom?.rotation ?? 0;
+            const w = (r === 90 || r === 270 ? c.height : c.width) + (f?.offset.x ?? 0);
+            return w > a ? w : a;
+          }, 0);
+          const globalAngle = anim.transfrom?.rotation ?? 0;
+          const globalMirror = anim.transfrom?.mirror ?? {x: false, y: false};
           for (let i = 0; i < frames.length; i++) {
-            const f = frames[i];
-            if (!f || !f.parent) continue;
+            const f = frames[i] as Sprite | undefined;
+            const fd = anim.frames[i]; // frame data
+            if (!f || !f.parent || !fd) continue;
+            const angle = globalAngle + (fd.transfrom?.rotation ?? 0);
+            const mirror = {
+              x: globalMirror.x !== (fd.transfrom?.mirror?.x ?? false),
+              y: globalMirror.y !== (fd.transfrom?.mirror?.y ?? false)
+            };
             const col = i % anim.columnLimit;
             const row = Math.floor(i / anim.columnLimit);
-            f.x = col * (widest + anim.padding) + anim.padding;
-            f.y = row * (tallest + anim.padding) + anim.padding;
+            const w = angle % 180 === 0 ? f.width : f.height;
+            const h = angle % 180 === 0 ? f.height : f.width;
+            f.x = col * (widest + anim.padding) + anim.padding + Math.floor(w * 0.5) + fd.offset.x;
+            f.y = row * (tallest + anim.padding) + anim.padding + Math.floor(h * 0.5) + fd.offset.y;
+            f.pivot.x = Math.floor(f.width * 0.5);
+            f.pivot.y = Math.floor(f.height * 0.5);
+            f.angle = angle;
+            f.scale.x = mirror.x ? -1 : 1;
+            f.scale.y = mirror.y ? -1 : 1;
+          }
+
+          // Fuck it rerender anim frames graphics every frame
+          // Change only if slow
+          const afg = scene.animFramesGraphics;
+          const af = scene.animFrames;
+          if (afg && af && anim) {
+            afg.clear();
+
+            const afe = animFramesElement;
+            const atr = sa !== null ? store.animFrames.transforms[sa] : null;
+
+            if (afe && atr) {
+              const {
+                x: afX,
+                y: afY,
+                width: afWidth,
+                height: afHeight
+              } = afe.getBoundingClientRect();
+
+              // local position and dimensions
+              const ls = scene.animFramesPos.toLocal({x: afX, y: afY});
+              const lw = afWidth / scene.animFramesPos.scale.x;
+              const lh = afHeight / scene.animFramesPos.scale.y;
+              const le = {x: ls.x + lw, y: ls.y + lh};
+
+              const scaledPadding = anim.padding * atr.scale;
+
+              const cols = Math.min(frames.length, anim.columnLimit);
+              const rows = Math.floor((frames.length - 1) / anim.columnLimit) + 1;
+              const totalW = cols * (widest * atr.scale + scaledPadding) + scaledPadding;
+              const totalH = rows * (tallest * atr.scale + scaledPadding) + scaledPadding;
+
+              // Darken surrounding area
+              afg.rect(ls.x, ls.y, lw, lh).fill({color: 0x000000, alpha: 0.5});
+
+
+              // Color padding
+              boundedRect(afg,ls,le,atr.pos.x,atr.pos.y,totalW,totalH).cut();
+
+              afg.rect(
+                atr.pos.x,
+                atr.pos.y,
+                totalW,
+                totalH
+              ).stroke({
+                pixelLine: true,
+                color: store.colours.margin
+              })
+              .fill({
+                color: store.colours.margin,
+                alpha: 0.5
+              });
+
+              // Scale frame width and height
+              const w = widest * atr.scale;
+              const h = tallest * atr.scale;
+
+              const startX = atr.pos.x + scaledPadding;
+              const startY = atr.pos.y + scaledPadding;
+
+              // Cut holes for frames in coloured padding
+              for (let i = 0; i < frames.length; i++) {
+                const c = i % anim.columnLimit;
+                const r = Math.floor(i / anim.columnLimit);
+                afg.rect(
+                  startX + c * (w + scaledPadding) + 0.01,
+                  startY + r * (h + scaledPadding) + 0.01,
+                  w - 0.02,
+                  h - 0.02
+                ).cut();
+              }
+
+              const sDim: [x: number, y: number, w: number, h: number] = [0,0,0,0];
+              for (let i = 0; i < frames.length; i++) {
+                const c = i % anim.columnLimit;
+                const r = Math.floor(i / anim.columnLimit);
+                if (i === store.selectedAnimFrames[sa]) {
+                  sDim[0] = startX + c * (w + scaledPadding);
+                  sDim[1] = startY + r * (h + scaledPadding);
+                  sDim[2] = w;
+                  sDim[3] = h;
+                } else {
+                  afg.rect(
+                    startX + c * (w + scaledPadding),
+                    startY + r * (h + scaledPadding),
+                    w, h
+                  ).fill({
+                    color: 0, alpha: 0.5
+                  }).stroke({
+                    color: store.colours.guides,
+                    pixelLine: true
+                  });
+                }
+              }
+              if (sDim[3] !== 0) {
+                afg.rect(...sDim).stroke({
+                  color: store.colours.selectedFrame,
+                  pixelLine: true
+                });
+              }
+
+              // let i = 0;
+              // if (sa !== null) {
+              //   for (const d of fDims) {
+              //     if (i !== store.selectedAnimFrames[sa]) {
+              //       afg.rect(...d).fill({color: 0, alpha: 0.5}).stroke({color: 0, alpha: 0.5, pixelLine: true});
+              //     } else {
+              //       afg.rect(...d).stroke({
+              //         color: store.colours.selectedFrame,
+              //         pixelLine: true
+              //       })
+              //     }
+              //     i++;
+              //   }
+              // }
+
+              // const dist = 16;
+              // createDashedLine(
+              //   afg, 0x00ff00,
+              //   {x: Math.floor(ls.x / dist) * dist, y: atr.pos.y},
+              //   {x: Math.floor((ls.x + lw) / dist) * dist, y: atr.pos.y},
+              //   dist * 0.5
+              // );
+              // createDashedLine(
+              //   afg, 0x00ff00,
+              //   {x: Math.floor(ls.x / dist) * dist, y: atr.pos.y + af.height + anim.padding * 2 * atr.scale},
+              //   {x: Math.floor((ls.x + lw) / dist) * dist, y: atr.pos.y + af.height + anim.padding * 2 * atr.scale},
+              //   dist * 0.5
+              // );
+              // createDashedLine(
+              //   afg, 0x00ff00,
+              //   {x: atr.pos.x, y: Math.floor(ls.y / dist) * dist},
+              //   {x: atr.pos.x, y: Math.floor((ls.y + lh) / dist) * dist},
+              //   dist * 0.5
+              // );
+              // createDashedLine(
+              //   afg, 0x00ff00,
+              //   {x: atr.pos.x + af.width + anim.padding * 2 * atr.scale, y: Math.floor(ls.y / dist) * dist},
+              //   {x: atr.pos.x + af.width + anim.padding * 2 * atr.scale, y: Math.floor((ls.y + lh) / dist) * dist},
+              //   dist * 0.5
+              // );
+            }
           }
         }
 
@@ -510,7 +748,7 @@ function TextureDisplayer({
           renderer.render({
             container: stage,
             clear: true,
-            clearColor: store.canvasColor
+            clearColor: store.colours.canvas
           });
         } catch (e) {
           console.error(e);
@@ -524,7 +762,7 @@ function TextureDisplayer({
     id = requestAnimationFrame(render);
 
     return () => cancelAnimationFrame(id);
-  }, [scene, animFramesElement]);
+  }, [scene, workAreaElement, animFramesElement]);
 
   // Logic
   useEffect(() => {
@@ -563,12 +801,22 @@ function TextureDisplayer({
             if (a) {
               const image = store.files.find(f => f.name === Object.entries(store.frames).find(([_, data]) => data.some(d => d.id === store.workArea.pointing?.framesId))?.[0])?.name;
               if (image !== undefined) {
-                a.frames.push({
+                const l = a.frames.push({
                   image,
                   durationFactor: 1,
-                  anchor: {x: store.workArea.pointing.x + store.workArea.pointing.w * 0.5, y: store.workArea.pointing.y + store.workArea.pointing.h * 0.5},
+                  offset: {
+                    x: 0,
+                    y: 0
+                  },
+                  // pivot: {
+                  //   x: store.workArea.pointing.w * 0.5,
+                  //   y: store.workArea.pointing.h * 0.5
+                  // },
                   bounds: [store.workArea.pointing.x, store.workArea.pointing.y, store.workArea.pointing.w, store.workArea.pointing.h],
                 });
+                if (store.selectedAnimFrames[store.selectedAnimation] === undefined) {
+                  store.selectedAnimFrames[store.selectedAnimation] = l - 1;
+                }
               }
             }
           }
