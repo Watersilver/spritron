@@ -76,9 +76,18 @@ function TextureLoader({
   const theme = useTheme();
   const isMediumDown = useMediaQuery(theme.breakpoints.down('md'));
 
+  const [collapsed, setCollapsed] = useState<Symbol | null>(null);
+
   const files = useWatch(() => store.files.length, () => [...store.files]);
   const imLength = useWatch(() => store.images.length, () => store.images.length);
-  const selected = useWatch(() => store.selectedImage, () => store.selectedImage);
+  const selected = useWatch(() => store.selectedImage, () => {
+    const s = Symbol();
+    setCollapsed(s);
+    setTimeout(() => {
+      setCollapsed(sb => sb === s ? null : sb);
+    });
+    return store.selectedImage;
+  });
 
   const selectedIndex = useRef(-1);
   useEffect(() => {
@@ -458,7 +467,7 @@ function TextureLoader({
                   </IconButton>
                 </ListItemButton>
               </ListItem>
-              <Collapse in={isSelected} timeout="auto" unmountOnExit>
+              <Collapse in={isSelected && !collapsed} timeout="auto" unmountOnExit>
                 <Box
                   // sx={theme => ({
                   sx={{

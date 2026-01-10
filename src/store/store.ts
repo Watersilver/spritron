@@ -49,6 +49,7 @@ type Store = {
     id: number;
     name: string;
     frames: {
+      id: number;
       /** Base Texture that this frame uses */
       image: string;
       /** This frame will last `durationFactor` frames */
@@ -95,6 +96,9 @@ type Store = {
         pos: {x: number; y: number;};
       }
     };
+    pointing: {
+      id: number;
+    } | null;
   };
   selectedImage: string | null;
   selectedFrames: number | null;
@@ -103,6 +107,7 @@ type Store = {
   mousePos: {x: number; y: number;};
   nextFramesId: number;
   nextAnimationId: number;
+  nextAnimationFrameId: number;
   colours: {
     canvas: string;
     selectedFrame: string;
@@ -125,7 +130,8 @@ const store = proxify<Store>({
   animFrames: {
     height: 33,
     grabbing: false,
-    transforms: {}
+    transforms: {},
+    pointing: null
   },
   animations: [],
   selectedImage: null,
@@ -135,6 +141,7 @@ const store = proxify<Store>({
   mousePos: {x: 0, y: 0},
   nextFramesId: 0,
   nextAnimationId: 0,
+  nextAnimationFrameId: 0,
   colours: {
     canvas: "#000",
     selectedFrame: "#f00",

@@ -12,20 +12,20 @@ function FrameOptions({
 }) {
   const selAnId = useWatch(() => store.selectedAnimation, () => store.selectedAnimation);
   const anims = useWatch(() => store.animations, () => deproxify(store.animations));
-  const selectedAnimFrames = useWatch(() => store.selectedAnimFrames, () => store.selectedAnimFrames);
+  const selectedAnimFrames = useWatch(() => store.selectedAnimFrames, () => deproxify(store.selectedAnimFrames));
   const [selAnFr, setSelAnFr] = useState<(typeof anims[number]['frames'][number]) | null>(null);
 
-  const safInd = useMemo(() => {
+  const safId = useMemo(() => {
     if (selAnId === null) return null;
     return selectedAnimFrames[selAnId] ?? null;
   }, [selAnId, selectedAnimFrames]);
 
   useEffect(() => {
-    if (selAnId === null || safInd === null) return;
+    if (selAnId === null || safId === null) return;
     const anim = anims.find(a => a.id === selAnId);
     if (!anim) return;
-    setSelAnFr(anim.frames[safInd] ?? null);
-  }, [selAnId, anims, safInd]);
+    setSelAnFr(anim.frames.find(f => f.id === safId) ?? null);
+  }, [selAnId, anims, safId]);
 
   return <Box
     sx={sx}
@@ -63,8 +63,8 @@ function FrameOptions({
               size="small"
               sx={{width: "5em"}}
               onChange={e => {
-                if (safInd === null) return;
-                const f = store.animations.find(an => an.id === selAnId)?.frames[safInd];
+                if (safId === null) return;
+                const f = store.animations.find(an => an.id === selAnId)?.frames.find(f => f.id === safId);
                 if (!f) return;
                 const v = Number(e.target.value);
                 if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
@@ -83,8 +83,8 @@ function FrameOptions({
             options={[0,90,180,270]}
             value={selAnFr?.transfrom?.rotation ?? 0}
             onChange={(_, v) => {
-              if (safInd === null) return;
-              const f = store.animations.find(an => an.id === selAnId)?.frames[safInd];
+              if (safId === null) return;
+              const f = store.animations.find(an => an.id === selAnId)?.frames.find(f => f.id === safId);
               if (!f) return;
               if (!f.transfrom) f.transfrom = {};
               if (v === 90 || v === 180 || v === 270) f.transfrom.rotation = v;
@@ -107,8 +107,8 @@ function FrameOptions({
               <Checkbox
                 value={selAnFr?.transfrom?.mirror?.x ?? false}
                 onChange={(_, c) => {
-                  if (safInd === null) return;
-                  const f = store.animations.find(an => an.id === selAnId)?.frames[safInd];
+                  if (safId === null) return;
+                  const f = store.animations.find(an => an.id === selAnId)?.frames.find(f => f.id === safId);
                   if (!f) return;
                   f.transfrom = f.transfrom ?? {};
                   f.transfrom.mirror = f.transfrom.mirror ?? {x: false, y: false};
@@ -130,8 +130,8 @@ function FrameOptions({
               <Checkbox
                 value={selAnFr?.transfrom?.mirror?.y ?? false}
                 onChange={(_, c) => {
-                  if (safInd === null) return;
-                  const f = store.animations.find(an => an.id === selAnId)?.frames[safInd];
+                  if (safId === null) return;
+                  const f = store.animations.find(an => an.id === selAnId)?.frames.find(f => f.id === safId);
                   if (!f) return;
                   f.transfrom = f.transfrom ?? {};
                   f.transfrom.mirror = f.transfrom.mirror ?? {x: false, y: false};
@@ -163,8 +163,8 @@ function FrameOptions({
               gridColumn: "-1 / 1"
             }}
             onChange={e => {
-              if (safInd === null) return;
-              const f = store.animations.find(an => an.id === selAnId)?.frames[safInd];
+              if (safId === null) return;
+              const f = store.animations.find(an => an.id === selAnId)?.frames.find(f => f.id === safId);
               if (!f) return;
               const v = Number(e.target.value);
               if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
@@ -184,8 +184,8 @@ function FrameOptions({
               gridColumn: "-1 / 1"
             }}
             onChange={e => {
-              if (safInd === null) return;
-              const f = store.animations.find(an => an.id === selAnId)?.frames[safInd];
+              if (safId === null) return;
+              const f = store.animations.find(an => an.id === selAnId)?.frames.find(f => f.id === safId);
               if (!f) return;
               const v = Number(e.target.value);
               if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {

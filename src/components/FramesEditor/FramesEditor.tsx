@@ -354,6 +354,8 @@ function ImageFramesEditor({
   </Fragment> : null;
 }
 
+let prevFramesLength: number | undefined = undefined;
+
 function FramesEditor({
   image,
   editable
@@ -361,10 +363,22 @@ function FramesEditor({
   image: string,
   editable?: boolean
 }) {
+  const [collapsed, setCollapsed] = useState<Symbol | null>(null);
 
   // Not optimal rendering but this wont ever be big enough to cause a problem
   const selectedImage = useWatch(() => store.selectedImage, () => store.selectedImage);
-  const selectedFrames = useWatch(() => store.selectedFrames, () => store.selectedFrames);
+  const selectedFrames = useWatch(() => store.selectedFrames, () => {
+    const l = store.selectedImage!== null ? store.frames[store.selectedImage]?.length : undefined;
+    if (prevFramesLength !== l) {
+      const s = Symbol();
+      setCollapsed(s);
+      setTimeout(() => {
+        setCollapsed(sb => sb === s ? null : sb);
+      });
+    }
+    prevFramesLength = l;
+    return store.selectedFrames;
+  });
   const frames = useWatch(
     () => store.frames[image],
     () => {
@@ -536,7 +550,7 @@ function FramesEditor({
               </ListItemButton>
             </ListItem>
             <Collapse
-              in={isSelected}
+              in={isSelected && !collapsed}
             >
               <ImageFramesEditor imageName={image} framesId={value.id} />
             </Collapse>

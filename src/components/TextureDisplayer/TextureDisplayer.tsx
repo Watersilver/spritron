@@ -5,6 +5,8 @@ import store, { ImageAsset, useWatch } from "../../store/store";
 import { Box, type SxProps, type Theme } from "@mui/material";
 import { deproxify } from "../../libs/proxy-state";
 
+const selAnimFramesData: {w: number; h: number; frames: {x: number; y: number; id: number;}[]} = {w: 0, h: 0, frames: []};
+
 function createDashedLine(
   g: Graphics, color: ColorSource,
   start: {x: number; y: number;},
@@ -163,6 +165,7 @@ function TextureDisplayer({
 
   const animations = useWatch(() => store.animations, () => deproxify(store.animations));
   const selectedAnimation = useWatch(() => store.selectedAnimation, () => store.selectedAnimation);
+  const dontFuckShitUpWithScale = useRef(false);
 
   // Create animation frames
   useEffect(() => {
@@ -185,6 +188,7 @@ function TextureDisplayer({
     for (const anim of newAnimFrames) {
       scene.animFrames.addChild(anim);
     }
+    dontFuckShitUpWithScale.current = true;
 
     return () => {
       for (const r of resources) {
@@ -336,13 +340,22 @@ function TextureDisplayer({
   );
 
   useEffect(() => {
-    if (!scene) return;
+    if (!scene) {
+      selAnimFramesData.w = 0;
+      selAnimFramesData.h = 0;
+      selAnimFramesData.frames.length = 0;
+      return;
+    }
 
     const {stage, renderer, debugCursor, workArea} = scene;
 
     let id: number;
 
     const render = () => {
+      selAnimFramesData.w = 0;
+      selAnimFramesData.h = 0;
+      selAnimFramesData.frames.length = 0;
+
       if (!workAreaElement) return;
       if (!stage.destroyed) {
         // workArea.rotation += 0.01;
@@ -498,7 +511,7 @@ function TextureDisplayer({
         if (store.workArea.grabbing || store.animFrames.grabbing) {
           // document.body.style.cursor = 'grab';
           document.body.style.cursor = 'grabbing';
-        } else if (store.workArea.pointing) {
+        } else if (store.workArea.pointing || store.animFrames.pointing) {
           document.body.style.cursor = 'pointer';
         } else {
           document.body.style.cursor = 'auto';
@@ -509,14 +522,15 @@ function TextureDisplayer({
         const sa = store.selectedAnimation;
         const anim = store.animations.find(a => a.id === sa);
         const frames = scene.animFrames.children;
-        const tallest = frames.reduce((a,c,i) => {
-          const f = anim?.frames[i];
-          let r = anim?.transfrom?.rotation ?? 0;
-          r += f?.transfrom?.rotation ?? 0;
-          const h = (r === 90 || r === 270 ? c.width : c.height) + (f?.offset.y ?? 0);
-          return h > a ? h : a;
-        }, 0);
         if (sa !== null && anim) {
+          const tallest = frames.reduce((a,c,i) => {
+            const f = anim.frames[i];
+            let r = anim.transfrom?.rotation ?? 0;
+            r += f?.transfrom?.rotation ?? 0;
+            const h = (r === 90 || r === 270 ? c.width : c.height) + (f?.offset.y ?? 0);
+            return h > a ? h : a;
+          }, 0);
+
           if (tallest > 0) {
             if (animFramesElement && !store.animFrames.transforms[sa]) {
               const {height} = animFramesElement.getBoundingClientRect();
@@ -539,7 +553,10 @@ function TextureDisplayer({
                 scAnFr.x = t.pos.x;
                 scAnFr.y = t.pos.y;
 
-                if (scAnFr.scale.x !== t.scale) {
+                // TODO: fix bug where shit gets fucked up when changing animation
+                if (dontFuckShitUpWithScale.current) {
+                  scAnFr.scale = t.scale;
+                } else if (scAnFr.scale.x !== t.scale) {
                   const ratio = t.scale/scAnFr.scale.x;
                   const oldMousePos = scAnFr.toLocal(store.mousePos);
                   const newMousePos = oldMousePos.clone();
@@ -559,6 +576,7 @@ function TextureDisplayer({
 
                   scAnFr.scale = t.scale;
                 }
+                dontFuckShitUpWithScale.current = false;
               }
             }
           } else {
@@ -670,26 +688,57 @@ function TextureDisplayer({
                 ).cut();
               }
 
+              selAnimFramesData.w = w;
+              selAnimFramesData.h = h;
               const sDim: [x: number, y: number, w: number, h: number] = [0,0,0,0];
+              let id: number | null = null;
               for (let i = 0; i < frames.length; i++) {
                 const c = i % anim.columnLimit;
                 const r = Math.floor(i / anim.columnLimit);
-                if (i === store.selectedAnimFrames[sa]) {
-                  sDim[0] = startX + c * (w + scaledPadding);
-                  sDim[1] = startY + r * (h + scaledPadding);
+                const x = startX + c * (w + scaledPadding);
+                const y = startY + r * (h + scaledPadding);
+                const f = anim.frames[i];
+                if (f) {
+                  selAnimFramesData.frames.push({x,y,id: f.id});
+                  id = f.id;
+                  // TODO: what do about ghosts
+                }
+                if (f?.id === store.selectedAnimFrames[sa]) {
+                  sDim[0] = x;
+                  sDim[1] = y;
                   sDim[2] = w;
                   sDim[3] = h;
                 } else {
                   afg.rect(
-                    startX + c * (w + scaledPadding),
-                    startY + r * (h + scaledPadding),
-                    w, h
-                  ).fill({
-                    color: 0, alpha: 0.5
-                  }).stroke({
+                    x,
+                    y,
+                    w,
+                    h
+                  );
+
+                  if (id !== store.animFrames.pointing?.id) {
+                    afg.fill({
+                      color: 0, alpha: 0.5
+                    });
+                  }
+
+                  afg.stroke({
                     color: store.colours.guides,
                     pixelLine: true
                   });
+                }
+
+                if (id === store.animFrames.pointing?.id) {
+                  afg.blendMode = "multiply";
+                  afg.rect(
+                    x,
+                    y,
+                    w,
+                    h
+                  ).fill({
+                    color: 0xffffff, alpha: 0.25
+                  });
+                  afg.blendMode = "normal";
                 }
               }
               if (sDim[3] !== 0) {
@@ -698,21 +747,6 @@ function TextureDisplayer({
                   pixelLine: true
                 });
               }
-
-              // let i = 0;
-              // if (sa !== null) {
-              //   for (const d of fDims) {
-              //     if (i !== store.selectedAnimFrames[sa]) {
-              //       afg.rect(...d).fill({color: 0, alpha: 0.5}).stroke({color: 0, alpha: 0.5, pixelLine: true});
-              //     } else {
-              //       afg.rect(...d).stroke({
-              //         color: store.colours.selectedFrame,
-              //         pixelLine: true
-              //       })
-              //     }
-              //     i++;
-              //   }
-              // }
 
               // const dist = 16;
               // createDashedLine(
@@ -801,22 +835,21 @@ function TextureDisplayer({
             if (a) {
               const image = store.files.find(f => f.name === Object.entries(store.frames).find(([_, data]) => data.some(d => d.id === store.workArea.pointing?.framesId))?.[0])?.name;
               if (image !== undefined) {
-                const l = a.frames.push({
+                a.frames.push({
+                  id: store.nextAnimationFrameId,
                   image,
                   durationFactor: 1,
                   offset: {
                     x: 0,
                     y: 0
                   },
-                  // pivot: {
-                  //   x: store.workArea.pointing.w * 0.5,
-                  //   y: store.workArea.pointing.h * 0.5
-                  // },
                   bounds: [store.workArea.pointing.x, store.workArea.pointing.y, store.workArea.pointing.w, store.workArea.pointing.h],
                 });
-                if (store.selectedAnimFrames[store.selectedAnimation] === undefined) {
-                  store.selectedAnimFrames[store.selectedAnimation] = l - 1;
-                }
+                // If you want to only select first added animation frame uncomment
+                // if (store.selectedAnimFrames[store.selectedAnimation] === undefined) {
+                  store.selectedAnimFrames[store.selectedAnimation] = store.nextAnimationFrameId;
+                // }
+                store.nextAnimationFrameId++;
               }
             }
           }
@@ -826,7 +859,14 @@ function TextureDisplayer({
       }
 
       if (isInElement(e, animFramesElement)) {
-        if (e.button === 1) {
+        if (e.button === 0) {
+          const p = store.animFrames.pointing;
+          if (p && store.selectedAnimation !== null) {
+            if (store.animations.find(a => a.id === store.selectedAnimation)?.frames.some(f => f.id === p.id)) {
+              store.selectedAnimFrames[store.selectedAnimation] = p.id;
+            }
+          }
+        } else if (e.button === 1) {
           grab(animFramesElement);
         }
       }
@@ -874,7 +914,6 @@ function TextureDisplayer({
     const mouseMoveWorkArea = (e: FederatedPointerEvent) => {
       store.mousePos.x = e.global.x;
       store.mousePos.y = e.global.y;
-      const {x, y} = e.getLocalPosition(scene.workArea);
 
       if (!scene.renderer.canvas.matches(":hover")) {
         store.workArea.pointing = null;
@@ -911,6 +950,7 @@ function TextureDisplayer({
       const h = f.dimensions.y;
 
       let p: typeof store.workArea.pointing = null;
+      const {x, y} = e.getLocalPosition(scene.workArea);
 
       for (let c = 0; c < f.grid.x; c++) {
         for (let r = 0; r < f.grid.y; r++) {
@@ -933,20 +973,83 @@ function TextureDisplayer({
       }
 
       store.workArea.pointing = p;
-    }
+    };
+
+    const mouseMoveAnimFramesArea = (e: FederatedPointerEvent) => {
+      if (!scene.renderer.canvas.matches(":hover")) {
+        store.animFrames.pointing = null;
+        return;
+      }
+      
+      if (!animFramesElement) {
+        store.animFrames.pointing = null;
+        return;
+      }
+
+      const r = animFramesElement.getBoundingClientRect();
+      if (
+        r.x > e.x || r.x + r.width < e.x
+        || r.y > e.y || r.y + r.height < e.y
+      ) {
+        store.animFrames.pointing = null;
+        return;
+      }
+
+      if (!store.selectedImage || store.selectedAnimation === null) {
+        store.animFrames.pointing = null;
+        return;
+      }
+      const anim = store.animations.find(a => a.id === store.selectedAnimation);
+      const f = anim?.frames;
+      if (!f) {
+        store.animFrames.pointing = null;
+        return;
+      }
+
+      const atr = store.animFrames.transforms[store.selectedAnimation];
+
+      if (!atr) {
+        store.animFrames.pointing = null;
+        return;
+      }
+
+      const {x, y} = e.getLocalPosition(scene.animFramesPos);
+      const {w, h} = selAnimFramesData;
+      let p: typeof store.animFrames.pointing = null;
+      for (const f of selAnimFramesData.frames) {
+        const startX = f.x;
+        const startY = f.y;
+
+        if (x >= startX && x <= startX + w && y >= startY && y <= startY + h) {
+          p = store.animFrames.pointing?.id === f.id
+          ? store.animFrames.pointing
+          : {
+            id: f.id
+          };
+          break;
+        }
+      }
+
+      store.animFrames.pointing = p;
+    };
+
+    const onGlobalpointermove = (e: FederatedPointerEvent) => {
+      mouseMoveWorkArea(e);
+      mouseMoveAnimFramesArea(e);
+    };
 
     canvas.addEventListener('pointerdown', mouseDown);
     window.addEventListener('pointerup', mouseUp);
     window.addEventListener('pointermove', mouseMove);
     canvas.addEventListener('wheel', wheel);
-    scene.workArea.on('globalpointermove', mouseMoveWorkArea);
+    scene.workArea.on('globalpointermove', onGlobalpointermove);
 
     return () => {
       canvas.removeEventListener('pointerdown', mouseDown);
       window.removeEventListener('pointerup', mouseUp);
       window.removeEventListener('pointermove', mouseMove);
       canvas.removeEventListener('wheel', wheel);
-      scene.workArea.off('globalpointermove', mouseMoveWorkArea);
+      scene.workArea.off('globalpointermove', onGlobalpointermove);
     }
   }, [scene, workAreaElement, animFramesElement]);
 
