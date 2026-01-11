@@ -103,7 +103,7 @@ type Store = {
   selectedImage: string | null;
   selectedFrames: number | null;
   selectedAnimation: number | null;
-  selectedAnimFrames: {[animId: number]: number};
+  selectedAnimFrames: {[animId: number]: number[]};
   mousePos: {x: number; y: number;};
   nextFramesId: number;
   nextAnimationId: number;

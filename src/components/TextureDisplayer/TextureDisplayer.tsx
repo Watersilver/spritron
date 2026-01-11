@@ -83,9 +83,6 @@ function TextureDisplayer({
       const workArea = new Container();
       workArea.eventMode = "static";
       stage.addChild(workArea);
-      const debugCursor = new Graphics().rect(0, 0, 1, 1).fill(0xff0000);
-      debugCursor.zIndex = 200;
-      workArea.addChild(debugCursor);
       const workAreaMask = new Graphics();
       workArea.mask = workAreaMask;
       stage.addChild(workAreaMask);
@@ -111,7 +108,6 @@ function TextureDisplayer({
         renderer,
         stage,
         workArea,
-        debugCursor,
         workAreaMask,
         animFrames,
         animFramesMask,
@@ -122,7 +118,6 @@ function TextureDisplayer({
     },
     cleanup: (scene) => {
       scene.grid.destroy();
-      scene.debugCursor.destroy();
       scene.workAreaMask.destroy();
       scene.workArea.destroy();
       scene.animFramesMask.destroy();
@@ -363,7 +358,7 @@ function TextureDisplayer({
       return;
     }
 
-    const {stage, renderer, debugCursor, workArea} = scene;
+    const {stage, renderer, workArea} = scene;
 
     let id: number;
 
@@ -374,13 +369,11 @@ function TextureDisplayer({
 
       if (!workAreaElement) return;
       if (!stage.destroyed) {
-        // workArea.rotation += 0.01;
 
         workArea.position.x = store.workArea.pos.x;
         workArea.position.y = store.workArea.pos.y;
 
         if (workArea.scale.x !== store.workArea.scale) {
-          // debugCursor.scale = 1 / store.workArea.scale;
 
           const ratio = store.workArea.scale/workArea.scale.x;
           const oldWorkAreaMousePos = workArea.toLocal(store.mousePos);
@@ -426,8 +419,6 @@ function TextureDisplayer({
         const mp = workArea.toLocal(store.mousePos);
         store.workArea.mousePos.x = mp.x;
         store.workArea.mousePos.y = mp.y;
-        debugCursor.position.x = Math.floor(mp.x);
-        debugCursor.position.y = Math.floor(mp.y);
 
 
         // Grid graphics build code
@@ -727,7 +718,7 @@ function TextureDisplayer({
 
               selAnimFramesData.w = w;
               selAnimFramesData.h = h;
-              const sDim: [x: number, y: number, w: number, h: number] = [0,0,0,0];
+              const sDim: [x: number, y: number, w: number, h: number][] = [];
               let id: number | null = null;
               for (let i = 0; i < frames.length; i++) {
                 const c = i % anim.columnLimit;
@@ -740,11 +731,8 @@ function TextureDisplayer({
                   id = f.id;
                   // TODO: what do about ghosts
                 }
-                if (f?.id === store.selectedAnimFrames[sa]) {
-                  sDim[0] = x;
-                  sDim[1] = y;
-                  sDim[2] = w;
-                  sDim[3] = h;
+                if (store.selectedAnimFrames[sa]?.some(saf => saf === f?.id)) {
+                  sDim.push([x,y,w,h]);
                 } else {
                   afg.rect(
                     x,
@@ -778,11 +766,13 @@ function TextureDisplayer({
                   afg.blendMode = "normal";
                 }
               }
-              if (sDim[3] !== 0) {
-                afg.rect(...sDim).stroke({
-                  color: store.colours.selectedFrame,
-                  pixelLine: true
-                });
+              if (sDim.length) {
+                for (const d of sDim) {
+                  afg.rect(...d).stroke({
+                    color: store.colours.selectedFrame,
+                    pixelLine: true
+                  });
+                }
               }
 
               // const dist = 16;
@@ -884,7 +874,7 @@ function TextureDisplayer({
                 });
                 // If you want to only select first added animation frame uncomment
                 // if (store.selectedAnimFrames[store.selectedAnimation] === undefined) {
-                  store.selectedAnimFrames[store.selectedAnimation] = store.nextAnimationFrameId;
+                  store.selectedAnimFrames[store.selectedAnimation] = [store.nextAnimationFrameId];
                 // }
                 store.nextAnimationFrameId++;
               }
@@ -900,7 +890,17 @@ function TextureDisplayer({
           const p = store.animFrames.pointing;
           if (p && store.selectedAnimation !== null) {
             if (store.animations.find(a => a.id === store.selectedAnimation)?.frames.some(f => f.id === p.id)) {
-              store.selectedAnimFrames[store.selectedAnimation] = p.id;
+              const sa = store.selectedAnimation;
+              if ((e.ctrlKey || e.shiftKey) && store.selectedAnimFrames[sa]) {
+                const i = store.selectedAnimFrames[sa].findIndex(id => id === p.id);
+                if (i !== -1) {
+                  store.selectedAnimFrames[sa].splice(i, 1);
+                } else {
+                  store.selectedAnimFrames[sa].push(p.id);
+                }
+              } else {
+                store.selectedAnimFrames[store.selectedAnimation] = [p.id];
+              }
             }
           }
         } else if (e.button === 1) {
