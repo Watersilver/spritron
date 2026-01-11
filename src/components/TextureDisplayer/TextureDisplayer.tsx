@@ -7,6 +7,8 @@ import { deproxify } from "../../libs/proxy-state";
 
 const selAnimFramesData: {w: number; h: number; frames: {x: number; y: number; id: number;}[]} = {w: 0, h: 0, frames: []};
 
+const workAreaTransCache: {[image: string]: {x: number; y: number; scale: number;}} = {};
+
 function createDashedLine(
   g: Graphics, color: ColorSource,
   start: {x: number; y: number;},
@@ -160,7 +162,21 @@ function TextureDisplayer({
 
   const images = useWatch(() => store.images.length, () => [...store.images]);
 
-  const selectedImageName = useWatch(() => store.selectedImage, () => store.selectedImage);
+  const forceWorkAreaTrans = useRef<null | typeof workAreaTransCache[string]>(null);
+
+  const selectedImageName = useWatch(() => store.selectedImage, () => {
+    const cachedNames = Object.keys(workAreaTransCache);
+    const deleted = cachedNames.filter(cn => !store.images.some(i => cn === i.file.name));
+    for (const d of deleted) {
+      delete workAreaTransCache[d];
+    }
+    if (store.selectedImage) {
+      const w = workAreaTransCache[store.selectedImage];
+      forceWorkAreaTrans.current = w ? {...w} : null;
+    }
+
+    return store.selectedImage;
+  });
 
 
   const animations = useWatch(() => store.animations, () => deproxify(store.animations));
@@ -360,7 +376,8 @@ function TextureDisplayer({
       if (!stage.destroyed) {
         // workArea.rotation += 0.01;
 
-        workArea.position = store.workArea.pos;
+        workArea.position.x = store.workArea.pos.x;
+        workArea.position.y = store.workArea.pos.y;
 
         if (workArea.scale.x !== store.workArea.scale) {
           // debugCursor.scale = 1 / store.workArea.scale;
@@ -383,6 +400,27 @@ function TextureDisplayer({
           workArea.position = store.workArea.pos;
 
           workArea.scale = store.workArea.scale;
+        }
+
+        const si = store.selectedImage;
+        if (si !== null) {
+          if (!workAreaTransCache[si]) {
+            workAreaTransCache[si] = {...store.workArea.pos, scale: store.workArea.scale};
+          } else {
+            workAreaTransCache[si].x = store.workArea.pos.x;
+            workAreaTransCache[si].y = store.workArea.pos.y;
+            workAreaTransCache[si].scale = store.workArea.scale;
+          }
+        }
+
+        if (forceWorkAreaTrans.current) {
+          workArea.position.x = forceWorkAreaTrans.current.x;
+          workArea.position.y = forceWorkAreaTrans.current.y;
+          workArea.scale = forceWorkAreaTrans.current.scale;
+          store.workArea.pos.x = forceWorkAreaTrans.current.x;
+          store.workArea.pos.y = forceWorkAreaTrans.current.y;
+          store.workArea.scale = forceWorkAreaTrans.current.scale;
+          forceWorkAreaTrans.current = null;
         }
 
         const mp = workArea.toLocal(store.mousePos);
@@ -553,7 +591,6 @@ function TextureDisplayer({
                 scAnFr.x = t.pos.x;
                 scAnFr.y = t.pos.y;
 
-                // TODO: fix bug where shit gets fucked up when changing animation
                 if (dontFuckShitUpWithScale.current) {
                   scAnFr.scale = t.scale;
                 } else if (scAnFr.scale.x !== t.scale) {
