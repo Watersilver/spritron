@@ -6,7 +6,72 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import store, { useWatch } from "../../store/store";
 import FramesEditor from "../FramesEditor/FramesEditor";
 import { deproxify } from '../../libs/proxy-state';
+import ColourInput from '../ColourInput/ColourInput';
 
+function TransparencyMapping({
+  curImg
+}: {
+  curImg: string | null
+}) {
+  const transMaps = useWatch(() => store.transMaps, () => deproxify(store.transMaps));
+  const tm = curImg ? transMaps[curImg] ?? [] : [];
+
+  return <Fragment>
+    {tm.length > 0 && <Typography
+      sx={{
+        pl: 2,
+        pb: 1
+      }}
+      color="textSecondary"
+    >
+      Transparency mapping
+    </Typography>}
+    <List
+      sx={{
+        // gridColumn: "1 / -1",
+        m: 0, p: 0
+      }}
+    >
+      {
+        tm.map(tc => {
+          return <ListItem
+            key={tc[2]}
+            sx={{
+              borderLeft: "rgba(144, 202, 249, 0.16) solid 8px"
+            }}
+          >
+            <ColourInput
+              value={tc[0] || {r:0,g:0,b:0}}
+              onChange={nv => {
+                const tm = curImg ? store.transMaps[curImg] : null;
+                if (!tm) return;
+                const t = tm.find(t => t[2] === tc[2]);
+                if (!t) return;
+                t[0] = nv;
+              }}
+              eyedrop={tc[2]}
+            />
+          </ListItem>;
+        })
+      }
+      <ListItemButton
+        onClick={() => {
+          if (curImg === null) return;
+          if (!store.transMaps[curImg]) {
+            store.transMaps[curImg] = [];
+          }
+          store.transMaps[curImg].push([{r:0,g:0,b:0}, 5, store.nextColId]);
+          store.nextColId++;
+        }}
+      >
+        <ListItemIcon>
+          <AddIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText primary="Add transparency" />
+      </ListItemButton>
+    </List>
+  </Fragment>
+}
 
 function FileDeletionDlgContent({
   file
@@ -477,6 +542,9 @@ function TextureLoader({
                   // })}
                 >
                   <List disablePadding>
+                    <TransparencyMapping
+                      curImg={file.name}
+                    />
                     <FramesEditor
                       image={file.name}
                       editable={editable}

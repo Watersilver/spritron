@@ -551,6 +551,7 @@ function FramesEditor({
             </ListItem>
             <Collapse
               in={isSelected && !collapsed}
+              unmountOnExit
             >
               <ImageFramesEditor imageName={image} framesId={value.id} />
             </Collapse>

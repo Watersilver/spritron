@@ -1,13 +1,99 @@
-import { autoDetectRenderer, Container, FederatedPointerEvent, Graphics, Rectangle, Sprite, Texture, type ColorSource } from "pixi.js";
+import { autoDetectRenderer, Container, FederatedPointerEvent, Filter, Graphics, Rectangle, Sprite, Texture, type ColorSource, type Renderer } from "pixi.js";
 import { useEffect, useRef, useState } from "react";
 import useResource from "../../utils/useResource";
 import store, { ImageAsset, useWatch } from "../../store/store";
 import { Box, type SxProps, type Theme } from "@mui/material";
 import { deproxify } from "../../libs/proxy-state";
 
+
 const selAnimFramesData: {w: number; h: number; frames: {x: number; y: number; id: number;}[]} = {w: 0, h: 0, frames: []};
 
 const workAreaTransCache: {[image: string]: {x: number; y: number; scale: number;}} = {};
+
+const getPixelColor = (renderer: Renderer, p: {x: number; y: number;}, container: Container) => {
+  const texture = renderer.textureGenerator.generateTexture({
+    target: container,
+    frame: new Rectangle(p.x,p.y,1,1)
+  });
+  const pxs = renderer.extract.pixels(texture);
+  texture.destroy(true);
+  return {r: pxs.pixels[0] ?? 0, g: pxs.pixels[1] ?? 0, b: pxs.pixels[2] ?? 0};
+}
+
+const isInElement = (m: {x: number; y: number}, el: HTMLElement | undefined): el is HTMLElement => {
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  if ((r.x > m.x) || (r.x + r.width < m.x)) return false;
+  if ((r.y > m.y) || (r.y + r.height < m.y)) return false;
+  return true;
+};
+
+function applyTranparencyMaps(c: Container, ct: typeof store.transMaps[string]) {
+  if (!ct) return;
+  let transparencyFilter: Filter | undefined = undefined;
+  const transCondition = ct.map(t => `
+    (c.r >= ${(t[0].r/255 - t[1]/100).toFixed(1)}
+    && c.r <= ${(t[0].r/255 + t[1]/100).toFixed(1)}
+    && c.g >= ${(t[0].g/255 - t[1]/100).toFixed(1)}
+    && c.g <= ${(t[0].g/255 + t[1]/100).toFixed(1)}
+    && c.b >= ${(t[0].b/255 - t[1]/100).toFixed(1)}
+    && c.b <= ${(t[0].b/255 + t[1]/100).toFixed(1)})
+  `).join("||");
+  const fragment = `
+    in vec2 vTextureCoord;
+
+    uniform sampler2D uTexture;
+
+    void main(void)
+    {
+      vec4 c = texture2D(uTexture, vTextureCoord);
+
+      if (
+        ${transCondition}
+      ) {
+        gl_FragColor = vec4(0.0,0.0,0.0,0.0);
+      } else {
+        gl_FragColor = c;
+      }
+    }
+  `;
+  const vertex = `
+    in vec2 aPosition;
+    out vec2 vTextureCoord;
+
+    uniform vec4 uInputSize;
+    uniform vec4 uOutputFrame;
+    uniform vec4 uOutputTexture;
+
+    vec4 filterVertexPosition( void )
+    {
+        vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
+        
+        position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+        position.y = position.y * (2.0*uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+
+        return vec4(position, 0.0, 1.0);
+    }
+
+    vec2 filterTextureCoord( void )
+    {
+        return aPosition * (uOutputFrame.zw * uInputSize.zw);
+    }
+
+    void main(void)
+    {
+        gl_Position = filterVertexPosition();
+        vTextureCoord = filterTextureCoord();
+    }
+  `;
+  transparencyFilter = Filter.from({
+    gl: {fragment, vertex},
+    gpu: {fragment: {source: fragment}, vertex: {source: vertex}}
+  });
+  c.filters = [transparencyFilter];
+
+  return [...c.filters];
+}
 
 function createDashedLine(
   g: Graphics, color: ColorSource,
@@ -59,7 +145,7 @@ const boundedRect = (
     finalW - padding * 2,
     finalH - padding * 2
   );
-}
+};
 
 function TextureDisplayer({
   sx,
@@ -73,6 +159,33 @@ function TextureDisplayer({
   animFramesElement?: HTMLElement;
 }) {
   const canvasContainer = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        store.eyedropTool = null;
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button === 2) {
+        if (store.eyedropTool !== null) {
+          e.stopPropagation();
+          e.preventDefault();
+          store.eyedropTool = null;
+        }
+      }
+    }
+
+    window.addEventListener("mousedown", onMouseDown);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("mousedown", onMouseDown);
+    }
+  }, []);
 
   // Setup/cleanup renderer and scene
   const {data: scene} = useResource({
@@ -103,6 +216,7 @@ function TextureDisplayer({
       const animFramesGraphics = new Graphics();
       animFramesGraphics.zIndex = 100;
       animFramesPos.addChild(animFramesGraphics);
+
 
       return {
         renderer,
@@ -175,13 +289,28 @@ function TextureDisplayer({
 
 
   const animations = useWatch(() => store.animations, () => deproxify(store.animations));
-  const selectedAnimation = useWatch(() => store.selectedAnimation, () => store.selectedAnimation);
+  const selectedAnimationId = useWatch(() => store.selectedAnimation, () => store.selectedAnimation);
+
+  const transMaps = useWatch(() => store.transMaps, () => deproxify(store.transMaps));
+  const tm = selectedImageName ? transMaps[selectedImageName] : null;
+
+  // Shader for whole animation
+  useEffect(() => {
+    if (!scene || !tm) return;
+    if (tm.length === 0) return;
+
+    const fs = applyTranparencyMaps(scene.animFrames, tm);
+
+    return () => fs?.forEach(f => f.destroy(true));
+  }, [scene, tm]);
+
+  
   const dontFuckShitUpWithScale = useRef(false);
 
   // Create animation frames
   useEffect(() => {
     if (!scene) return;
-    const a = animations.find(a => a.id === selectedAnimation);
+    const a = animations.find(a => a.id === selectedAnimationId);
     if (!a) return;
 
     const resources: [Sprite, Texture][] = [];
@@ -208,7 +337,7 @@ function TextureDisplayer({
         r[1].destroy();
       }
     };
-  }, [animations, selectedAnimation, scene]);
+  }, [animations, selectedAnimationId, scene]);
 
 
 
@@ -337,6 +466,7 @@ function TextureDisplayer({
       () => store.selectedFrames,
       () => store.selectedImage,
       () => store.workArea.pointing,
+      () => store.eyedropTool,
       () => store.frames // Suboptimal but who cares? I don't.
     ],
     () => {
@@ -422,11 +552,12 @@ function TextureDisplayer({
 
 
         // Grid graphics build code
-        if (rerenderGrid.current) {
+        // if (rerenderGrid.current) {
           rerenderGrid.current = false;
           if (
             store.selectedImage === null
             || store.selectedFrames === null
+            || store.eyedropTool !== null
           ) {
             scene.grid.clear();
           } else {
@@ -511,35 +642,40 @@ function TextureDisplayer({
               createDashedLine(
                 grid, store.colours.guides,
                 {x: Math.floor(ls.x / dist) * dist, y: f.position.y},
-                {x: Math.floor((ls.x + lw) / dist) * dist, y: f.position.y},
+                {x: ls.x + lw, y: f.position.y},
                 dist * 0.5
               );
               createDashedLine(
                 grid, store.colours.guides,
                 {x: Math.floor(ls.x / dist) * dist, y: f.position.y + f.dimensions.y + (f.grid.y - 1) * (f.dimensions.y + f.padding.y)},
-                {x: Math.floor((ls.x + lw) / dist) * dist, y: f.position.y + f.dimensions.y + (f.grid.y - 1) * (f.dimensions.y + f.padding.y)},
+                {x: ls.x + lw, y: f.position.y + f.dimensions.y + (f.grid.y - 1) * (f.dimensions.y + f.padding.y)},
                 dist * 0.5
               );
               createDashedLine(
                 grid, store.colours.guides,
                 {x: f.position.x, y: Math.floor(ls.y / dist) * dist},
-                {x: f.position.x, y: Math.floor((ls.y + lh) / dist) * dist},
+                {x: f.position.x, y: ls.y + lh},
                 dist * 0.5
               );
               createDashedLine(
                 grid, store.colours.guides,
                 {x: f.position.x + f.dimensions.x + (f.grid.x - 1) * (f.dimensions.x + f.padding.x), y: Math.floor(ls.y / dist) * dist},
-                {x: f.position.x + f.dimensions.x + (f.grid.x - 1) * (f.dimensions.x + f.padding.x), y: Math.floor((ls.y + lh) / dist) * dist},
+                {x: f.position.x + f.dimensions.x + (f.grid.x - 1) * (f.dimensions.x + f.padding.x), y: ls.y + lh},
                 dist * 0.5
               );
             }
           }
-        }
+        // }
 
 
         if (store.workArea.grabbing || store.animFrames.grabbing) {
           // document.body.style.cursor = 'grab';
           document.body.style.cursor = 'grabbing';
+        } else if (store.eyedropTool !== null && (
+            isInElement({...store.mousePos}, workAreaElement)
+            || isInElement({...store.mousePos}, animFramesElement)
+          )) {
+          document.body.style.cursor = 'crosshair';
         } else if (store.workArea.pointing || store.animFrames.pointing) {
           document.body.style.cursor = 'pointer';
         } else {
@@ -649,7 +785,11 @@ function TextureDisplayer({
           // Change only if slow
           const afg = scene.animFramesGraphics;
           const af = scene.animFrames;
-          if (afg && af && anim) {
+          if (store.eyedropTool !== null) {
+            if (afg) {
+              afg.clear();
+            }
+          } else if (afg && af && anim) {
             afg.clear();
 
             const afe = animFramesElement;
@@ -841,15 +981,7 @@ function TextureDisplayer({
     const ungrab = () => {
       store.workArea.grabbing = false;
       store.animFrames.grabbing = false;
-    }
-
-    const isInElement = (e: PointerEvent | WheelEvent, el: HTMLElement | undefined): el is HTMLElement => {
-      if (!el) return false;
-      const r = el.getBoundingClientRect();
-      if (r.x > e.x || r.x + r.width < e.x) return false;
-      if (r.y > e.y || r.y + r.height < e.y) return false;
-      return true;
-    }
+    };
 
     const mouseDown = async (e: PointerEvent) => {
       const d = canvasContainer.current;
@@ -857,6 +989,14 @@ function TextureDisplayer({
 
       if (isInElement(e, workAreaElement)) {
         if (e.button === 0) {
+
+          if (store.eyedropTool !== null) {
+            const c = getPixelColor(scene.renderer, {...store.mousePos}, scene.stage);
+            store.eyedropPickedCol = c;
+            store.eyedropTool = null;
+            return;
+          }
+
           if (store.workArea.pointing && store.selectedAnimation !== null) {
             const a = store.animations.find(a => a.id === store.selectedAnimation);
             if (a) {
@@ -883,9 +1023,7 @@ function TextureDisplayer({
         } else if (e.button === 1) {
           grab(workAreaElement);
         }
-      }
-
-      if (isInElement(e, animFramesElement)) {
+      } else if (isInElement(e, animFramesElement)) {
         if (e.button === 0) {
           const p = store.animFrames.pointing;
           if (p && store.selectedAnimation !== null) {

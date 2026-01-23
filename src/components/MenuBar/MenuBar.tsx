@@ -1,6 +1,7 @@
-import { Box, IconButton, Typography, type Theme, type SxProps } from "@mui/material"
+import { Box, IconButton, type Theme, type SxProps } from "@mui/material"
 import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
 import store, { useWatch } from "../../store/store";
+import ColourInput from "../ColourInput/ColourInput";
 
 // ? info: how and when to refresh
 // explain that one might need to change relative paths in json depending on folder structure
@@ -25,51 +26,11 @@ function MenuBar({
     >
       <Box></Box>
       <Box></Box>
-      <Box
-        sx={{
-          display: "grid",
-          alignItems: "center",
-          gridTemplateAreas: "a"
-        }}
-      >
-        <input
-          type="color"
-          value={bgc}
-          onChange={e => {
-            store.colours.canvas = e.target.value;
-          }}
-          style={{
-            borderRadius: 0,
-            border: 0,
-            backgroundColor: "none",
-            padding: 0,
-            gridArea: "a",
-            width: "64px"
-          }}
-        />
-        <Typography
-          variant="subtitle2"
-          sx={{
-            gridArea: "a",
-            pointerEvents: "none",
-            display: "grid",
-            justifyItems: "center",
-            textShadow: `
-              0px 1px black,
-              1px 1px black,
-              1px 0px black,
-              1px -1px black,
-              0px -1px black,
-              -1px -1px black,
-              -1px 0px black,
-              -1px 1px black
-            `
-          }}
-          inert
-        >
-          bg colour
-        </Typography>
-      </Box>
+      <ColourInput
+        title="bg colour"
+        valueStr={bgc}
+        onChangeStr={(e) => {store.colours.canvas = e.target.value;}}
+      />
       <IconButton sx={{borderRadius: 0}}>
         <QuestionMarkIcon />
       </IconButton>

@@ -18,13 +18,13 @@ class ImageAsset {
   get bitmap() {return this.#bitmap;}
 };
 
-type ColorHex = number;
-type ColorRange = ColorHex | [ColorHex, ColorHex];
+type ColourRgb = {r: number; g: number; b: number;};
+type ColorRange = [colorRgb: ColourRgb, threshold: number, id: number];
 
 type ColorTransform = {
   shader?: string;
-  transparentColors?: [];
-  colorMap?: {from: ColorRange, to: ColorHex;};
+  transparentColors?: ColorRange[];
+  colorMap?: {from: ColorRange, to: ColourRgb;}[];
 };
 
 type Transform = {
@@ -32,9 +32,39 @@ type Transform = {
   mirror?: {x: boolean; y: boolean;};
 };
 
+type Animation = {
+  id: number;
+  name: string;
+  frames: {
+    id: number;
+    /** Base Texture that this frame uses */
+    image: string;
+    /** This frame will last `durationFactor` frames */
+    durationFactor: number;
+    /** The actual part of the texture this frame uses */
+    bounds: [x: number, y: number, w: number, h: number];
+    offset: {x: number; y: number;};
+    colorTransform?: ColorTransform;
+    transfrom?: Transform;
+  }[];
+  fps: number;
+  loop?: boolean;
+  pingPong?: boolean;
+  // Do not apply these settings to texture itself,
+  // because the user could easily do it themself
+  // with something like gimp
+  colorTransform?: ColorTransform;
+  padding: number;
+  columnLimit: number;
+  transfrom?: Transform;
+}
+
 type Store = {
   files: File[];
   images: ImageAsset[];
+  transMaps: {
+    [imageName: string]: ColorRange[];
+  };
   frames: {
     [imageName: string]: {
       id: number;
@@ -45,32 +75,7 @@ type Store = {
       grid: {x: number; y: number};
     }[];
   };
-  animations: {
-    id: number;
-    name: string;
-    frames: {
-      id: number;
-      /** Base Texture that this frame uses */
-      image: string;
-      /** This frame will last `durationFactor` frames */
-      durationFactor: number;
-      /** The actual part of the texture this frame uses */
-      bounds: [x: number, y: number, w: number, h: number];
-      offset: {x: number; y: number;};
-      colorTransform?: ColorTransform;
-      transfrom?: Transform;
-    }[];
-    fps: number;
-    loop?: boolean;
-    pingPong?: boolean;
-    // Do not apply these settings to texture itself,
-    // because the user could easily do it themself
-    // with something like gimp
-    colorTransform?: ColorTransform;
-    padding: number;
-    columnLimit: number;
-    transfrom?: Transform;
-  }[];
+  animations: Animation[];
   shaders?: {
     id: number;
     name: string;
@@ -108,17 +113,22 @@ type Store = {
   nextFramesId: number;
   nextAnimationId: number;
   nextAnimationFrameId: number;
+  nextColId: number;
+  eyedropTool: number | null;
+  eyedropPickedCol: {r: number; g: number; b: number;} | null;
   colours: {
     canvas: string;
     selectedFrame: string;
     margin: string;
     guides: string;
-  }
+  };
+  // selectedAnimationObj: Animation | null;
 };
 
 const store = proxify<Store>({
   files: [],
   images: [],
+  transMaps: {},
   frames: {},
   workArea: {
     scale: 1,
@@ -142,12 +152,16 @@ const store = proxify<Store>({
   nextFramesId: 0,
   nextAnimationId: 0,
   nextAnimationFrameId: 0,
+  nextColId: 0,
+  eyedropTool: null,
+  eyedropPickedCol: null,
   colours: {
     canvas: "#000",
     selectedFrame: "#f00",
     margin: "#A464CB",
     guides: "#0f0",
-  }
+  },
+  // selectedAnimationObj: null
 });
 // Initialize colours
 for (const c of (Object.keys(store.colours) as unknown as (keyof typeof store["colours"])[])) {
@@ -156,6 +170,17 @@ for (const c of (Object.keys(store.colours) as unknown as (keyof typeof store["c
     store.colours[c] = stored;
   }
 }
+
+// subscribeMultiple([() => store.selectedAnimation, () => store.animations.length], () => {
+//   const sal = store.animations.find(a => a.id === store.selectedAnimation);
+//   if (!sal) {
+//     store.selectedAnimationObj = null;
+//     return;
+//   }
+//   if (!store.selectedAnimationObj) store.selectedAnimationObj = sal;
+//   if (sal.id === store.selectedAnimationObj.id) return;
+//   store.selectedAnimationObj = sal;
+// });
 
 // This horrible thing need to exist because of the await of createImageBitmap that introduces
 // weird race conditions. If files length changes via push it runs a lot of times and fucks everything up.
@@ -184,6 +209,8 @@ subscribe(() => store.files.length, async () => {
         i.bitmap.close();
         i.texture.destroy(true);
       }, 100);
+
+      delete store.transMaps[i.file.name];
 
       cleaned.push(i);
     }
