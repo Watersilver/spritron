@@ -72,14 +72,16 @@ function App() {
           right: 0,
           top: 0,
           bottom: 0,
-          display: 'grid',
-          gridTemplateAreas: `"app-area"`,
           pointerEvents: 'none'
         }}
       >
         <TextureDisplayer
           sx={{
-            gridArea: "app-area",
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
             zIndex: 0,
             pointerEvents: "auto"
           }}
@@ -88,7 +90,11 @@ function App() {
         />
         <Box
           sx={{
-            gridArea: "app-area",
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
             display: 'grid',
             gridTemplateAreas: `
               "a c e"

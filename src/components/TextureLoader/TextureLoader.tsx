@@ -50,6 +50,14 @@ function TransparencyMapping({
                 t[0] = nv;
               }}
               eyedrop={tc[2]}
+              thresholdDefault={tc[1]}
+              onThresholdChange={nv => {
+                const tm = curImg ? store.transMaps[curImg] : null;
+                if (!tm) return;
+                const t = tm.find(t => t[2] === tc[2]);
+                if (!t) return;
+                t[1] = nv;
+              }}
             />
           </ListItem>;
         })
@@ -427,13 +435,13 @@ function TextureLoader({
       sx={{
         height: "100%",
         display: "grid",
-        gridTemplateRows: "auto 1fr",
+        gridTemplateRows: "auto 1fr"
       }}
     >
       <List
         disablePadding
         onClick={e => {e.stopPropagation()}}
-        sx={{overflow: "auto"}}
+        sx={{ overflow: "auto", overflowX: "hidden" }}
       >
         {/* <Collapse
           in={store.selectedImage !== null}
@@ -630,6 +638,7 @@ function TextureLoader({
           </Box>
         </Box>
       </Box>
+      {/* <Box sx={{minWidth: "200px"}} /> */}
       <Collapse
         in={showUploadButton}
       >

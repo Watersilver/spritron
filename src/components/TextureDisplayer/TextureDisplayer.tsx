@@ -10,6 +10,9 @@ const selAnimFramesData: {w: number; h: number; frames: {x: number; y: number; i
 
 const workAreaTransCache: {[image: string]: {x: number; y: number; scale: number;}} = {};
 
+const transFilters: {[image: string]: Filter & {[isTransFilter]?: boolean}} = {};
+const isTransFilter = Symbol();
+
 const getPixelColor = (renderer: Renderer, p: {x: number; y: number;}, container: Container) => {
   const texture = renderer.textureGenerator.generateTexture({
     target: container,
@@ -28,35 +31,12 @@ const isInElement = (m: {x: number; y: number}, el: HTMLElement | undefined): el
   return true;
 };
 
-function applyTranparencyMaps(c: Container, ct: typeof store.transMaps[string]) {
-  if (!ct) return;
-  let transparencyFilter: Filter | undefined = undefined;
-  const transCondition = ct.map(t => `
-    (c.r >= ${(t[0].r/255 - t[1]/100).toFixed(1)}
-    && c.r <= ${(t[0].r/255 + t[1]/100).toFixed(1)}
-    && c.g >= ${(t[0].g/255 - t[1]/100).toFixed(1)}
-    && c.g <= ${(t[0].g/255 + t[1]/100).toFixed(1)}
-    && c.b >= ${(t[0].b/255 - t[1]/100).toFixed(1)}
-    && c.b <= ${(t[0].b/255 + t[1]/100).toFixed(1)})
-  `).join("||");
-  const fragment = `
-    in vec2 vTextureCoord;
+function generateTransFilters(maps: typeof store.transMaps) {
+  for (const im of Object.keys(transFilters)) {
+    transFilters[im]!.destroy(true);
+    delete transFilters[im];
+  }
 
-    uniform sampler2D uTexture;
-
-    void main(void)
-    {
-      vec4 c = texture2D(uTexture, vTextureCoord);
-
-      if (
-        ${transCondition}
-      ) {
-        gl_FragColor = vec4(0.0,0.0,0.0,0.0);
-      } else {
-        gl_FragColor = c;
-      }
-    }
-  `;
   const vertex = `
     in vec2 aPosition;
     out vec2 vTextureCoord;
@@ -86,13 +66,40 @@ function applyTranparencyMaps(c: Container, ct: typeof store.transMaps[string]) 
         vTextureCoord = filterTextureCoord();
     }
   `;
-  transparencyFilter = Filter.from({
-    gl: {fragment, vertex},
-    gpu: {fragment: {source: fragment}, vertex: {source: vertex}}
-  });
-  c.filters = [transparencyFilter];
 
-  return [...c.filters];
+  for (const [im, cols] of Object.entries(maps)) {
+    if (cols.length === 0) continue;
+    const fragment = `
+      in vec2 vTextureCoord;
+
+      uniform sampler2D uTexture;
+
+      void main(void)
+      {
+        vec4 c = texture2D(uTexture, vTextureCoord);
+
+        if (
+          ${cols.map(t => `
+            (c.r >= ${(t[0].r/255 - t[1]/100).toFixed(1)}
+            && c.r <= ${(t[0].r/255 + t[1]/100).toFixed(1)}
+            && c.g >= ${(t[0].g/255 - t[1]/100).toFixed(1)}
+            && c.g <= ${(t[0].g/255 + t[1]/100).toFixed(1)}
+            && c.b >= ${(t[0].b/255 - t[1]/100).toFixed(1)}
+            && c.b <= ${(t[0].b/255 + t[1]/100).toFixed(1)})
+          `).join("||")}
+        ) {
+          gl_FragColor = vec4(0.0,0.0,0.0,0.0);
+        } else {
+          gl_FragColor = c;
+        }
+      }
+    `;
+    transFilters[im] = Filter.from({
+      gl: {fragment, vertex},
+      gpu: {fragment: {source: fragment}, vertex: {source: vertex}}
+    });
+    transFilters[im][isTransFilter] = true;
+  }
 }
 
 function createDashedLine(
@@ -292,17 +299,17 @@ function TextureDisplayer({
   const selectedAnimationId = useWatch(() => store.selectedAnimation, () => store.selectedAnimation);
 
   const transMaps = useWatch(() => store.transMaps, () => deproxify(store.transMaps));
-  const tm = selectedImageName ? transMaps[selectedImageName] : null;
 
-  // Shader for whole animation
+  // Transparency filter
   useEffect(() => {
-    if (!scene || !tm) return;
-    if (tm.length === 0) return;
+    if (!scene) return;
+    // Remove previous transparency filters
+    scene.animFrames.children.forEach(child => child.filters && (child.filters = child.filters.filter(f => !(isTransFilter in f))));
+    scene.workArea.children.forEach(child => child.filters && (child.filters = child.filters.filter(f => !(isTransFilter in f))));
 
-    const fs = applyTranparencyMaps(scene.animFrames, tm);
-
-    return () => fs?.forEach(f => f.destroy(true));
-  }, [scene, tm]);
+    // Generate new transparency filters
+    generateTransFilters(transMaps);
+  }, [transMaps, scene]);
 
   
   const dontFuckShitUpWithScale = useRef(false);
@@ -550,6 +557,21 @@ function TextureDisplayer({
         store.workArea.mousePos.x = mp.x;
         store.workArea.mousePos.y = mp.y;
 
+        if (store.selectedImage !== null) {
+          const transFilter = transFilters[store.selectedImage];
+          if (transFilter) {
+            const spr = workArea.children.find(c => c instanceof Sprite);
+
+            if (spr) {
+              if (!spr.filters) {
+                spr.filters = [transFilter];
+              } else if (!spr.filters.some(filter => transFilter === filter)) {
+                spr.filters = [...spr.filters, transFilter];
+              }
+            }
+          }
+        }
+
 
         // Grid graphics build code
         // if (rerenderGrid.current) {
@@ -779,6 +801,15 @@ function TextureDisplayer({
             f.angle = angle;
             f.scale.x = mirror.x ? -1 : 1;
             f.scale.y = mirror.y ? -1 : 1;
+
+            const transFilter = transFilters[fd.image];
+            if (transFilter) {
+              if (!f.filters) {
+                f.filters = [transFilter];
+              } else if (!f.filters.some(filter => transFilter === filter)) {
+                f.filters = [...f.filters, transFilter];
+              }
+            }
           }
 
           // Fuck it rerender anim frames graphics every frame

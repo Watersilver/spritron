@@ -1,4 +1,4 @@
-import { Box, IconButton, Typography } from "@mui/material";
+import { Box, IconButton, Slider, Stack, Tooltip, Typography } from "@mui/material";
 import ColorizeIcon from '@mui/icons-material/Colorize';
 import store, { useWatch } from "../../store/store";
 import { useEffect, useRef } from "react";
@@ -25,7 +25,9 @@ function ColourInput({
   onChange,
   onChangeStr,
   title,
-  eyedrop
+  eyedrop,
+  thresholdDefault,
+  onThresholdChange
 }: {
   value?: {r: number, g: number, b: number},
   valueStr?: string;
@@ -33,8 +35,12 @@ function ColourInput({
   onChangeStr?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   title?: string;
   eyedrop?: typeof store.eyedropTool;
+  thresholdDefault?: number;
+  onThresholdChange?: (newVal: number) => void;
 }) {
   const e = useWatch(() => store.eyedropTool, () => store.eyedropTool);
+
+  const defThresVal = useRef(thresholdDefault);
 
   const ocRef = useRef(onChange);
   ocRef.current = onChange;
@@ -55,12 +61,9 @@ function ColourInput({
   + toClamped2DigitHexStr(value.b)
   : '#000';
 
-  return <Box
-    sx={{
-      display: "grid",
-      alignItems: "center",
-      gridTemplateColumns: "1fr auto"
-    }}
+  return <Stack
+    direction='row'
+    spacing={1}
   >
     <Box
       sx={{
@@ -127,7 +130,30 @@ function ColourInput({
       </IconButton>
       : null
     }
-  </Box>;
+    {
+      defThresVal.current !== undefined
+      ? <>
+        <Stack>
+          <Tooltip
+            title="Threshold"
+            placement="top"
+          >
+            <Slider
+              defaultValue={defThresVal.current}
+              max={25}
+              sx={{minWidth: 75}}
+              onChangeCommitted={(_, v) => onThresholdChange?.(v)}
+              // valueLabelDisplay="auto"
+              // valueLabelFormat={v => {
+              //   return "Threshold: " + v;
+              // }}
+            />
+          </Tooltip>
+        </Stack>
+      </>
+      : null
+    }
+  </Stack>;
 }
 
 export default ColourInput;
