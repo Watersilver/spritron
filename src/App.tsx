@@ -41,6 +41,7 @@ function App() {
 
   const [workAreaElement, setWorkAreaElement] = useState<HTMLElement>();
   const [animFramesElement, setAnimFramesElement] = useState<HTMLElement>();
+  const [previewElement, setPreviewElement] = useState<HTMLElement>();
 
   const isAnimSelected = useWatch(() => store.selectedAnimation, () => store.selectedAnimation !== null);
   const animFramesHeight = useWatch(() => store.animFrames.height, () => store.animFrames.height);
@@ -87,6 +88,7 @@ function App() {
           }}
           workAreaElement={workAreaElement}
           animFramesElement={animFramesElement}
+          previewElement={previewElement}
         />
         <Box
           sx={{
@@ -184,10 +186,28 @@ function App() {
                 }
               }}
             />
-            {/* TODO */}
             <Box
-              sx={{gridArea: "animation-preview"}}
-            />
+              sx={{
+                display: "grid",
+                gridArea: "animation-preview",
+                gridTemplateColumns: "auto 1fr",
+                width: `calc(${animFramesHeight + "vh"} + 8px)`
+              }}
+            >
+              <Box
+                sx={theme => ({
+                  backgroundColor: theme.palette.background.default,
+                  width: 8
+                })}
+              />
+              <Box
+                ref={e => {
+                  if (e instanceof HTMLElement) {
+                    setPreviewElement(e);
+                  }
+                }}
+              />
+            </Box>
           </Box> : null}
           <CoordsTracker
             sx={theme => ({

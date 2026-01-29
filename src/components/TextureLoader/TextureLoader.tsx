@@ -58,6 +58,12 @@ function TransparencyMapping({
                 if (!t) return;
                 t[1] = nv;
               }}
+              onDelete={() => {
+                if (curImg === null) return;
+                const tm = store.transMaps[curImg];
+                if (!tm) return;
+                store.transMaps[curImg] = tm.filter(m => m[2] !== tc[2]);
+              }}
             />
           </ListItem>;
         })

@@ -6,12 +6,20 @@ import { Box, type SxProps, type Theme } from "@mui/material";
 import { deproxify } from "../../libs/proxy-state";
 
 
+let aniFrame = 0;
+let prevTime = -1;
+
 const selAnimFramesData: {w: number; h: number; frames: {x: number; y: number; id: number;}[]} = {w: 0, h: 0, frames: []};
 
 const workAreaTransCache: {[image: string]: {x: number; y: number; scale: number;}} = {};
 
 const transFilters: {[image: string]: Filter & {[isTransFilter]?: boolean}} = {};
 const isTransFilter = Symbol();
+
+const getFrameData = (anim: typeof store.animations[number], frame: number) => {
+  // TODO: handle ghost frames
+  return anim.frames[frame];
+};
 
 const getPixelColor = (renderer: Renderer, p: {x: number; y: number;}, container: Container) => {
   const texture = renderer.textureGenerator.generateTexture({
@@ -158,14 +166,21 @@ function TextureDisplayer({
   sx,
   style,
   workAreaElement,
-  animFramesElement
+  animFramesElement,
+  previewElement
 }: {
   sx?: SxProps<Theme>;
   style?: React.CSSProperties;
   workAreaElement?: HTMLElement;
   animFramesElement?: HTMLElement;
+  previewElement?: HTMLElement;
 }) {
   const canvasContainer = useRef<HTMLDivElement>(null);
+
+  // Initialize time
+  useEffect(() => {
+    prevTime = performance.now();
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -206,6 +221,15 @@ function TextureDisplayer({
       const workAreaMask = new Graphics();
       workArea.mask = workAreaMask;
       stage.addChild(workAreaMask);
+      const preview = new Container();
+      stage.addChild(preview);
+      const previewSpritePos = new Container();
+      preview.addChild(previewSpritePos);
+      const previewSprite = new Sprite();
+      previewSpritePos.addChild(previewSprite);
+      const previewMask = new Graphics();
+      preview.mask = previewMask;
+      stage.addChild(previewMask);
 
       const grid = new Graphics();
       grid.zIndex = 100;
@@ -235,6 +259,10 @@ function TextureDisplayer({
         animFramesPos,
         animFramesGraphics,
         grid,
+        preview,
+        previewMask,
+        previewSprite,
+        previewSpritePos
       };
     },
     cleanup: (scene) => {
@@ -245,6 +273,10 @@ function TextureDisplayer({
       scene.animFrames.destroy();
       scene.animFramesGraphics.destroy();
       scene.animFramesPos.destroy();
+      scene.previewSprite.destroy();
+      scene.previewSpritePos.destroy();
+      scene.previewMask.destroy();
+      scene.preview.destroy();
       scene.stage.destroy();
       scene.renderer.destroy();
     },
@@ -298,6 +330,10 @@ function TextureDisplayer({
   const animations = useWatch(() => store.animations, () => deproxify(store.animations));
   const selectedAnimationId = useWatch(() => store.selectedAnimation, () => store.selectedAnimation);
 
+  useEffect(() => {
+    aniFrame = 0;
+  }, [selectedAnimationId]);
+
   const transMaps = useWatch(() => store.transMaps, () => deproxify(store.transMaps));
 
   // Transparency filter
@@ -306,12 +342,15 @@ function TextureDisplayer({
     // Remove previous transparency filters
     scene.animFrames.children.forEach(child => child.filters && (child.filters = child.filters.filter(f => !(isTransFilter in f))));
     scene.workArea.children.forEach(child => child.filters && (child.filters = child.filters.filter(f => !(isTransFilter in f))));
+    if (scene.preview.filters) {
+      scene.preview.filters = scene.preview.filters.filter(f => !(isTransFilter in f));
+    }
 
     // Generate new transparency filters
     generateTransFilters(transMaps);
   }, [transMaps, scene]);
 
-  
+
   const dontFuckShitUpWithScale = useRef(false);
 
   // Create animation frames
@@ -463,6 +502,39 @@ function TextureDisplayer({
     };
   }, [animFramesElement, scene]);
 
+  useEffect(() => {
+    if (!previewElement || !scene) return;
+
+    const ro = new ResizeObserver((e) => {
+      const entry = e.find(entry => entry.target === previewElement);
+      if (entry) {
+        const rect = previewElement.getBoundingClientRect();
+        scene.preview.x = rect.x;
+        scene.preview.y = rect.y;
+
+        const size = entry.contentBoxSize.reduce((a, c) => ({
+          blockSize: a.blockSize + c.blockSize,
+          inlineSize: a.inlineSize + c.inlineSize
+        }), {blockSize: 0, inlineSize: 0});
+
+        scene.previewSpritePos.x = size.inlineSize * 0.5;
+        scene.previewSpritePos.y = size.blockSize * 0.5;
+
+        scene.previewMask.clear();
+        scene.previewMask
+        .rect(rect.x, rect.y, size.inlineSize, size.blockSize)
+        .fill(0xffffff);
+      }
+    });
+
+    // Callback gets called when observing starts
+    ro.observe(previewElement);
+
+    return () => {
+      ro.disconnect();
+    };
+  }, [previewElement, scene]);
+
 
   const rerenderGrid = useRef(false);
 
@@ -499,7 +571,10 @@ function TextureDisplayer({
 
     let id: number;
 
-    const render = () => {
+    const render = (t: number) => {
+      const dt = (t - prevTime) / 1000;
+      prevTime = t;
+
       selAnimFramesData.w = 0;
       selAnimFramesData.h = 0;
       selAnimFramesData.frames.length = 0;
@@ -783,7 +858,7 @@ function TextureDisplayer({
           const globalMirror = anim.transfrom?.mirror ?? {x: false, y: false};
           for (let i = 0; i < frames.length; i++) {
             const f = frames[i] as Sprite | undefined;
-            const fd = anim.frames[i]; // frame data
+            const fd = getFrameData(anim, i);
             if (!f || !f.parent || !fd) continue;
             const angle = globalAngle + (fd.transfrom?.rotation ?? 0);
             const mirror = {
@@ -973,6 +1048,85 @@ function TextureDisplayer({
               // );
             }
           }
+
+          aniFrame = frames.length === 0 ? 0 : aniFrame % frames.length;
+          const i = Math.floor(aniFrame);
+          const f = frames[i];
+          const fd = getFrameData(anim, i);
+            // f.x = col * (widest + anim.padding) + anim.padding + Math.floor(w * 0.5) + fd.offset.x;
+            // f.y = row * (tallest + anim.padding) + anim.padding + Math.floor(h * 0.5) + fd.offset.y;
+          if (f instanceof Sprite && fd) {
+            scene.previewSprite.texture = f.texture;
+            // scene.previewSprite.pivot.x = Math.floor(scene.previewSprite.width * 0.5);
+            // scene.previewSprite.pivot.y = Math.floor(scene.previewSprite.height * 0.5);
+            const angle = globalAngle + (fd.transfrom?.rotation ?? 0);
+            const mirror = {
+              x: globalMirror.x !== (fd.transfrom?.mirror?.x ?? false),
+              y: globalMirror.y !== (fd.transfrom?.mirror?.y ?? false)
+            };
+            scene.previewSprite.angle = angle;
+            scene.previewSprite.scale.x = mirror.x ? -1 : 1;
+            scene.previewSprite.scale.y = mirror.y ? -1 : 1;
+            const sprW = angle % 180 === 0 ? scene.previewSprite.width : scene.previewSprite.height;
+            const sprH = angle % 180 === 0 ? scene.previewSprite.height : scene.previewSprite.width;
+            scene.previewSprite.x = fd.offset.x - widest * 0.5;
+            scene.previewSprite.y = fd.offset.y - tallest * 0.5;
+
+            // Hello future self
+            // This sucks, however my brain is fried and burned out so that's how it's gonna be
+            // Have fun! Fuck you
+            if (angle === 90) {
+              scene.previewSprite.x += sprW;
+              if (mirror.x) {
+                scene.previewSprite.y += sprH;
+              }
+              if (mirror.y) {
+                scene.previewSprite.x -= sprW;
+              }
+            } else if (angle === 180) {
+              scene.previewSprite.x += sprW;
+              scene.previewSprite.y += sprH;
+              if (mirror.x) {
+                scene.previewSprite.x -= sprW;
+              }
+              if (mirror.y) {
+                scene.previewSprite.y -= sprH;
+              }
+            } else if (angle === 270) {
+              scene.previewSprite.y += sprH;
+              if (mirror.x) {
+                scene.previewSprite.y -= sprH;
+              }
+              if (mirror.y) {
+                scene.previewSprite.x += sprW;
+              }
+            } else {
+              if (mirror.x) {
+                scene.previewSprite.x += sprW;
+              }
+              if (mirror.y) {
+                scene.previewSprite.y += sprH;
+              }
+            }
+
+            
+            const transFilter = transFilters[fd.image];
+            if (transFilter) {
+              if (!scene.preview.filters) {
+                scene.preview.filters = [transFilter];
+              } else if (!scene.preview.filters.some(filter => transFilter === filter)) {
+                scene.preview.filters = [...scene.preview.filters, transFilter];
+              }
+            }
+          }
+
+          // Determine scale
+          if (previewElement) {
+            const {width, height} = previewElement.getBoundingClientRect();
+            scene.previewSpritePos.scale = Math.min(width / widest, height / tallest);
+          }
+
+          aniFrame += dt * anim.fps;
         }
 
 
@@ -984,6 +1138,7 @@ function TextureDisplayer({
           });
         } catch (e) {
           console.error(e);
+          throw e;
         }
 
         id = requestAnimationFrame(render);
@@ -994,7 +1149,7 @@ function TextureDisplayer({
     id = requestAnimationFrame(render);
 
     return () => cancelAnimationFrame(id);
-  }, [scene, workAreaElement, animFramesElement]);
+  }, [scene, workAreaElement, animFramesElement, previewElement]);
 
   // Logic
   useEffect(() => {
@@ -1056,6 +1211,14 @@ function TextureDisplayer({
         }
       } else if (isInElement(e, animFramesElement)) {
         if (e.button === 0) {
+
+          if (store.eyedropTool !== null) {
+            const c = getPixelColor(scene.renderer, {...store.mousePos}, scene.stage);
+            store.eyedropPickedCol = c;
+            store.eyedropTool = null;
+            return;
+          }
+
           const p = store.animFrames.pointing;
           if (p && store.selectedAnimation !== null) {
             if (store.animations.find(a => a.id === store.selectedAnimation)?.frames.some(f => f.id === p.id)) {

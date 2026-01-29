@@ -2,6 +2,7 @@ import { Box, IconButton, Slider, Stack, Tooltip, Typography } from "@mui/materi
 import ColorizeIcon from '@mui/icons-material/Colorize';
 import store, { useWatch } from "../../store/store";
 import { useEffect, useRef } from "react";
+import ClearIcon from '@mui/icons-material/Clear';
 
 
 function toClamped2DigitHexStr(n: number) {
@@ -27,7 +28,8 @@ function ColourInput({
   title,
   eyedrop,
   thresholdDefault,
-  onThresholdChange
+  onThresholdChange,
+  onDelete
 }: {
   value?: {r: number, g: number, b: number},
   valueStr?: string;
@@ -37,6 +39,7 @@ function ColourInput({
   eyedrop?: typeof store.eyedropTool;
   thresholdDefault?: number;
   onThresholdChange?: (newVal: number) => void;
+  onDelete?: () => void;
 }) {
   const e = useWatch(() => store.eyedropTool, () => store.eyedropTool);
 
@@ -64,6 +67,12 @@ function ColourInput({
   return <Stack
     direction='row'
     spacing={1}
+    sx={{
+      "--del-col": 0,
+      "&:hover": {
+        "--del-col": 1
+      }
+    }}
   >
     <Box
       sx={{
@@ -90,7 +99,7 @@ function ColourInput({
           backgroundColor: "none",
           padding: 0,
           gridArea: "a",
-          width: "64px"
+          width: title === undefined ? "32px" : "64px"
         }}
       />
       {title !== undefined && <Typography
@@ -133,24 +142,36 @@ function ColourInput({
     {
       defThresVal.current !== undefined
       ? <>
-        <Stack>
-          <Tooltip
-            title="Threshold"
-            placement="top"
-          >
-            <Slider
-              defaultValue={defThresVal.current}
-              max={25}
-              sx={{minWidth: 75}}
-              onChangeCommitted={(_, v) => onThresholdChange?.(v)}
-              // valueLabelDisplay="auto"
-              // valueLabelFormat={v => {
-              //   return "Threshold: " + v;
-              // }}
-            />
-          </Tooltip>
-        </Stack>
+        <Tooltip
+          title="Threshold"
+          placement="top"
+        >
+          <Slider
+            defaultValue={defThresVal.current}
+            max={25}
+            sx={{minWidth: 75}}
+            onChangeCommitted={(_, v) => onThresholdChange?.(v)}
+            // valueLabelDisplay="auto"
+            // valueLabelFormat={v => {
+            //   return "Threshold: " + v;
+            // }}
+          />
+        </Tooltip>
       </>
+      : null
+    }
+    {
+      onDelete !== undefined
+      ? <IconButton
+        color="error"
+        sx={{
+          opacity: "var(--del-col)",
+          transition: "opacity 0.1s"
+        }}
+        onClick={onDelete}
+      >
+        <ClearIcon />
+      </IconButton>
       : null
     }
   </Stack>;
