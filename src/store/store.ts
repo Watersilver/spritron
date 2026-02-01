@@ -104,6 +104,11 @@ type Store = {
     pointing: {
       id: number;
     } | null;
+    grabbedFrame: {
+      id: number;
+      offset: {x: number; y: number;};
+    } | null;
+    mousePos: {x: number; y: number;};
   };
   selectedImage: string | null;
   selectedFrames: number | null;
@@ -141,7 +146,9 @@ const store = proxify<Store>({
     height: 33,
     grabbing: false,
     transforms: {},
-    pointing: null
+    pointing: null,
+    grabbedFrame: null,
+    mousePos: {x: 0, y: 0}
   },
   animations: [],
   selectedImage: null,

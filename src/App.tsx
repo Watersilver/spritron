@@ -28,10 +28,14 @@ function CoordsTracker({
   sx?: SxProps<Theme>
 }) {
   const mousePos = useWatch(() => store.workArea.mousePos, () => deproxify(store.workArea.mousePos));
+  const yomama = useWatch(() => store.workArea.mousePos, () => deproxify(store.animFrames.mousePos));
 
   return <Box sx={sx}>
     <Typography variant="subtitle2" color="textSecondary">
       [{Math.floor(mousePos.x)},{Math.floor(mousePos.y)}]
+    </Typography>
+    <Typography variant="subtitle2" color="textSecondary">
+      [{Math.floor(yomama.x)},{Math.floor(yomama.y)}]
     </Typography>
   </Box>
 }

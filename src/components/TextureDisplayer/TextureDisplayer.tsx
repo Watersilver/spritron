@@ -240,6 +240,12 @@ function TextureDisplayer({
       stage.addChild(animFramesPos);
       const animFrames = new Container();
       animFramesPos.addChild(animFrames);
+      const animFramesGrabbed = new Container();
+      animFramesGrabbed.zIndex = 200;
+      animFramesPos.addChild(animFramesGrabbed);
+      const animFramesGrabbedSprite = new Sprite();
+      animFramesGrabbedSprite.anchor = 0.5;
+      animFramesGrabbed.addChild(animFramesGrabbedSprite);
       const animFramesMask = new Graphics();
       animFramesPos.mask = animFramesMask;
       stage.addChild(animFramesMask);
@@ -255,6 +261,8 @@ function TextureDisplayer({
         workArea,
         workAreaMask,
         animFrames,
+        animFramesGrabbedSprite,
+        animFramesGrabbed,
         animFramesMask,
         animFramesPos,
         animFramesGraphics,
@@ -270,6 +278,8 @@ function TextureDisplayer({
       scene.workAreaMask.destroy();
       scene.workArea.destroy();
       scene.animFramesMask.destroy();
+      scene.animFramesGrabbedSprite.destroy();
+      scene.animFramesGrabbed.destroy();
       scene.animFrames.destroy();
       scene.animFramesGraphics.destroy();
       scene.animFramesPos.destroy();
@@ -342,6 +352,9 @@ function TextureDisplayer({
     // Remove previous transparency filters
     scene.animFrames.children.forEach(child => child.filters && (child.filters = child.filters.filter(f => !(isTransFilter in f))));
     scene.workArea.children.forEach(child => child.filters && (child.filters = child.filters.filter(f => !(isTransFilter in f))));
+    if (scene.animFramesGrabbedSprite.filters) {
+      scene.animFramesGrabbedSprite.filters = scene.animFramesGrabbedSprite.filters.filter(f => !(isTransFilter in f));
+    }
     if (scene.preview.filters) {
       scene.preview.filters = scene.preview.filters.filter(f => !(isTransFilter in f));
     }
@@ -628,9 +641,9 @@ function TextureDisplayer({
           forceWorkAreaTrans.current = null;
         }
 
-        const mp = workArea.toLocal(store.mousePos);
-        store.workArea.mousePos.x = mp.x;
-        store.workArea.mousePos.y = mp.y;
+        const wamp = workArea.toLocal(store.mousePos);
+        store.workArea.mousePos.x = wamp.x;
+        store.workArea.mousePos.y = wamp.y;
 
         if (store.selectedImage !== null) {
           const transFilter = transFilters[store.selectedImage];
@@ -765,8 +778,9 @@ function TextureDisplayer({
         // }
 
 
-        if (store.workArea.grabbing || store.animFrames.grabbing) {
-          // document.body.style.cursor = 'grab';
+        if (store.animFrames.grabbedFrame) {
+          document.body.style.cursor = 'grab';
+        } else if (store.workArea.grabbing || store.animFrames.grabbing) {
           document.body.style.cursor = 'grabbing';
         } else if (store.eyedropTool !== null && (
             isInElement({...store.mousePos}, workAreaElement)
@@ -784,6 +798,7 @@ function TextureDisplayer({
         const sa = store.selectedAnimation;
         const anim = store.animations.find(a => a.id === sa);
         const frames = scene.animFrames.children;
+        const af = scene.animFrames;
         if (sa !== null && anim) {
           const tallest = frames.reduce((a,c,i) => {
             const f = anim.frames[i];
@@ -802,24 +817,21 @@ function TextureDisplayer({
               };
 
               const t = store.animFrames.transforms[sa];
-              const scAnFr = scene.animFrames;
 
-              scAnFr.x = t.pos.x;
-              scAnFr.y = t.pos.y;
-              scAnFr.scale = t.scale;
+              af.x = t.pos.x;
+              af.y = t.pos.y;
+              af.scale = t.scale;
             } else {
               const t = store.animFrames.transforms[sa];
               if (t) {
-                const scAnFr = scene.animFrames;
-
-                scAnFr.x = t.pos.x;
-                scAnFr.y = t.pos.y;
+                af.x = t.pos.x;
+                af.y = t.pos.y;
 
                 if (dontFuckShitUpWithScale.current) {
-                  scAnFr.scale = t.scale;
-                } else if (scAnFr.scale.x !== t.scale) {
-                  const ratio = t.scale/scAnFr.scale.x;
-                  const oldMousePos = scAnFr.toLocal(store.mousePos);
+                  af.scale = t.scale;
+                } else if (af.scale.x !== t.scale) {
+                  const ratio = t.scale/af.scale.x;
+                  const oldMousePos = af.toLocal(store.mousePos);
                   const newMousePos = oldMousePos.clone();
                   newMousePos.x /= ratio;
                   newMousePos.y /= ratio;
@@ -833,9 +845,9 @@ function TextureDisplayer({
 
                   t.pos.x += diff.x;
                   t.pos.y += diff.y;
-                  scAnFr.position = t.pos;
+                  af.position = {...t.pos};
 
-                  scAnFr.scale = t.scale;
+                  af.scale = t.scale;
                 }
                 dontFuckShitUpWithScale.current = false;
               }
@@ -844,6 +856,10 @@ function TextureDisplayer({
             // Reset when deleting all frames
             delete store.animFrames.transforms[sa];
           }
+
+          const afmp = af.toLocal(store.mousePos);
+          store.animFrames.mousePos.x = afmp.x;
+          store.animFrames.mousePos.y = afmp.y;
 
 
           // Individual animation frames placement
@@ -856,6 +872,17 @@ function TextureDisplayer({
           }, 0);
           const globalAngle = anim.transfrom?.rotation ?? 0;
           const globalMirror = anim.transfrom?.mirror ?? {x: false, y: false};
+
+
+          let i1 = anim.frames.findIndex(f => f.id === store.animFrames.grabbedFrame?.id);
+          let i2 = anim.frames.findIndex(f => f.id === store.animFrames.pointing?.id);
+          if (i2 === -1) {
+            i2 = Infinity;
+          }
+          const shuffleFromGrab = i1 !== -1 && i1 !== i2;
+          scene.animFramesGrabbed.position = scene.animFrames.position;
+          scene.animFramesGrabbed.scale = scene.animFrames.scale;
+          scene.animFramesGrabbedSprite.texture = Texture.EMPTY;
           for (let i = 0; i < frames.length; i++) {
             const f = frames[i] as Sprite | undefined;
             const fd = getFrameData(anim, i);
@@ -865,8 +892,16 @@ function TextureDisplayer({
               x: globalMirror.x !== (fd.transfrom?.mirror?.x ?? false),
               y: globalMirror.y !== (fd.transfrom?.mirror?.y ?? false)
             };
-            const col = i % anim.columnLimit;
-            const row = Math.floor(i / anim.columnLimit);
+            let j = i;
+            if (shuffleFromGrab) {
+              if (j >= i1 && j <= i2) {
+                j--;
+              } else if (j <= i1 && j >= i2) {
+                j++;
+              }
+            }
+            const col = j % anim.columnLimit;
+            const row = Math.floor(j / anim.columnLimit);
             const w = angle % 180 === 0 ? f.width : f.height;
             const h = angle % 180 === 0 ? f.height : f.width;
             f.x = col * (widest + anim.padding) + anim.padding + Math.floor(w * 0.5) + fd.offset.x;
@@ -885,12 +920,32 @@ function TextureDisplayer({
                 f.filters = [...f.filters, transFilter];
               }
             }
+
+            if (fd.id === store.animFrames.grabbedFrame?.id) {
+              f.alpha = 0;
+              scene.animFramesGrabbedSprite.texture = f.texture;
+              scene.animFramesGrabbedSprite.x = store.animFrames.mousePos.x + store.animFrames.grabbedFrame.offset.x;
+              scene.animFramesGrabbedSprite.y = store.animFrames.mousePos.y + store.animFrames.grabbedFrame.offset.y;
+              scene.animFramesGrabbedSprite.angle = f.angle;
+              scene.animFramesGrabbedSprite.scale = f.scale;
+              scene.animFramesGrabbedSprite.scale.x *= 1.1;
+              scene.animFramesGrabbedSprite.scale.y *= 1.1;
+              // scene.animFramesGrabbedSprite.alpha = 0.75;
+              if (transFilter) {
+                if (!scene.animFramesGrabbedSprite.filters) {
+                  scene.animFramesGrabbedSprite.filters = [transFilter];
+                } else if (!scene.animFramesGrabbedSprite.filters.some(filter => transFilter === filter)) {
+                  scene.animFramesGrabbedSprite.filters = [...scene.animFramesGrabbedSprite.filters, transFilter];
+                }
+              }
+            } else {
+              f.alpha = 1;
+            }
           }
 
           // Fuck it rerender anim frames graphics every frame
           // Change only if slow
           const afg = scene.animFramesGraphics;
-          const af = scene.animFrames;
           if (store.eyedropTool !== null) {
             if (afg) {
               afg.clear();
@@ -1221,7 +1276,9 @@ function TextureDisplayer({
 
           const p = store.animFrames.pointing;
           if (p && store.selectedAnimation !== null) {
-            if (store.animations.find(a => a.id === store.selectedAnimation)?.frames.some(f => f.id === p.id)) {
+            const selAn = store.animations.find(a => a.id === store.selectedAnimation);
+            const selFrIn = selAn?.frames.findIndex(f => f.id === p.id);
+            if (selFrIn !== -1 && selFrIn !== undefined) {
               const sa = store.selectedAnimation;
               if ((e.ctrlKey || e.shiftKey) && store.selectedAnimFrames[sa]) {
                 const i = store.selectedAnimFrames[sa].findIndex(id => id === p.id);
@@ -1233,6 +1290,28 @@ function TextureDisplayer({
               } else {
                 store.selectedAnimFrames[store.selectedAnimation] = [p.id];
               }
+            }
+
+            let offset = {x: 0, y: 0};
+            if (store.selectedImage !== null) {
+              if (selFrIn !== -1 && selFrIn !== undefined) {
+                const c = scene.animFrames.children[selFrIn];
+                if (c) {
+                  const a = c.angle;
+                  const s = c.scale;
+                  c.angle = 0;
+                  c.scale = 1;
+                  const l = c.toLocal(store.mousePos);
+                  c.angle = a;
+                  c.scale = s;
+                  offset.x = c.width * 0.5 - l.x;
+                  offset.y = c.height * 0.5 - l.y;
+                }
+              }
+            }
+            store.animFrames.grabbedFrame = {
+              id: p.id,
+              offset
             }
           }
         } else if (e.button === 1) {
@@ -1248,6 +1327,31 @@ function TextureDisplayer({
       if (e.button === 1) {
         ungrab();
       }
+
+      if (store.animFrames.grabbedFrame && store.animFrames.pointing) {
+        const gid = store.animFrames.grabbedFrame.id;
+        const pid = store.animFrames.pointing.id;
+        if (gid !== pid) {
+          const selAn = store.animations.find(a => a.id === store.selectedAnimation);
+          if (selAn) {
+            let frs = [...selAn.frames];
+            const movedIndex = frs.findIndex(f => f.id === gid);
+            const moved = frs[movedIndex];
+            if (moved) {
+              frs = frs.filter(f => f.id !== gid);
+              const i = frs.findIndex(f => f.id === pid);
+              if (i < movedIndex) {
+                frs.splice(i, 0, moved);
+              } else {
+                frs.splice(i + 1, 0, moved);
+              }
+            }
+            selAn.frames = frs;
+          }
+        }
+        store.animFrames.pointing.id = store.animFrames.grabbedFrame.id;
+      }
+      store.animFrames.grabbedFrame = null;
     }
 
     const mouseMove = (e: PointerEvent) => {
