@@ -4,10 +4,11 @@ import useResource from "../../utils/useResource";
 import store, { ImageAsset, useWatch } from "../../store/store";
 import { Box, type SxProps, type Theme } from "@mui/material";
 import { deproxify } from "../../libs/proxy-state";
+import { saveAs } from "file-saver";
+import JSZip from "jszip";
 
 
 
-const downloadLink = document.createElement("a");
 let prevImage: ImageLike | null = null;
 
 let prevTime = -1;
@@ -1316,24 +1317,59 @@ function TextureDisplayer({
 
             renderer.extract.image({
               target: af,
-              frame: new Rectangle(
+              frame: store.extractImageTrim ? undefined : new Rectangle(
                 0, 0,
                 p + cols * (widest + p),
                 p + rows * (tallest + p),
               ),
               format: store.extractImageFormat
-            }).then((i) => {
+            })
+            .then((i) => {
               prevImage?.remove();
               prevImage = i;
               if (i instanceof HTMLElement) {
-                // TODO: bundle with json that contains anim duractions?
-                downloadLink.href = i.src;
-                downloadLink.download = anim.name;
-                // Why?? https://stackoverflow.com/a/65939108
-                // downloadLink.dataset.downloadurl = ["image/" + store.extractImageFormat, downloadLink.download, downloadLink.href].join(":");
-                downloadLink.click();
+                fetch(i.src)
+                .then(r => r.blob())
+                .then(imBlob => {
+                  const zip = new JSZip();
+                  zip.file(anim.name + "." + store.extractImageFormat, imBlob);
+                  const json = {
+                    width: widest,
+                    height: tallest,
+                    offset: store.extractImageTrim ? 0 : p,
+                    padding: p,
+                    columns: cols,
+                    rows,
+                    framesPerSecond: anim.fps,
+                    loop: anim.loop,
+                    durationFactors:
+                      anim.pingPong
+                      ? [
+                        ...anim.frames.map(f => f.durationFactor),
+                        ...(() => {
+                          const frs = [...anim.frames].reverse().map(f => f.durationFactor);
+                          if (anim.pingPong.noFirst) {
+                            frs.pop();
+                          }
+                          if (anim.pingPong.noLast) {
+                            frs.shift();
+                          }
+                          return frs;
+                        })()
+                      ]
+                      : anim.frames.map(f => f.durationFactor)
+                  };
+                  zip.file(anim.name + ".json", JSON.stringify(json));
+                  zip.generateAsync({type: "blob"})
+                  .then(b => {
+                    saveAs(b, anim.name);
+                  })
+                  .finally(() => store.extractImage = null);
+                })
+                .catch(() => store.extractImage = null);
               }
-            }).finally(() => store.extractImage = null);
+            })
+            .catch(() => store.extractImage = null);
           }
         }
 

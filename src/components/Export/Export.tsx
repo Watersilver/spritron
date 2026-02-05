@@ -1,4 +1,4 @@
-import { Button, FormControlLabel, ListItemText, Menu, MenuItem, Radio, RadioGroup, Stack, Tooltip, type PopoverOrigin, type SxProps, type Theme, type TooltipProps } from "@mui/material";
+import { Box, Button, Checkbox, FormControlLabel, ListItemText, Menu, MenuItem, Radio, RadioGroup, Stack, Tooltip, Typography, type PopoverOrigin, type SxProps, type Theme, type TooltipProps } from "@mui/material";
 import { useState } from "react";
 import store, { useWatch } from "../../store/store";
 import { deproxify } from "../../libs/proxy-state";
@@ -27,6 +27,8 @@ function Export({
   const isAnimValid = !!anim && anim.frames.length > 0;
   const isAnyAnimValid = anims.some(a => a.frames.length > 0);
   const extractImageFormat = useWatch(() => store.extractImageFormat, () => store.extractImageFormat);
+  const extractImageTrim = useWatch(() => store.extractImageTrim, () => store.extractImageTrim);
+  const extractImageAnimData = useWatch(() => store.extractImageAnimData, () => store.extractImageAnimData);
 
   useWatch(() => store.extractImage, () => {
     if (store.extractImage === null) {
@@ -139,7 +141,7 @@ function Export({
             downloadLink.download = "animations";
             downloadLink.href = window.URL.createObjectURL(blob);
             // Why?? https://stackoverflow.com/a/65939108
-            // link.dataset.downloadurl = ["application/json", link.download, link.href].join(":");
+            // downloadLink.dataset.downloadurl = ["application/json", downloadLink.download, downloadLink.href].join(":");
             downloadLink.click();
 
             setOpen(false);
@@ -168,6 +170,59 @@ function Export({
               primary="Image Export"
               secondary={!anim ? "*Select an animation" : isAnimValid ? undefined : "*Animation is empty"}
             />
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "auto auto 1fr",
+                gap: 1
+              }}
+            >
+              <Tooltip
+                title="Trims the outside layer of padding"
+              >
+                <FormControlLabel
+                  sx={{mr: 0}}
+                  onClick={e => e.stopPropagation()}
+                  control={
+                    <Checkbox
+                      checked={extractImageTrim}
+                      onChange={(_, c) => {
+                        store.extractImageTrim = c;
+                      }}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Typography variant="subtitle2" color="textSecondary">
+                      Trim
+                    </Typography>
+                  }
+                />
+              </Tooltip>
+              <Tooltip
+                title="Includes json with animation data"
+              >
+                <FormControlLabel
+                  sx={{mr: 0}}
+                  onClick={e => e.stopPropagation()}
+                  control={
+                    <Checkbox
+                      checked={extractImageAnimData}
+                      onChange={(_, c) => {
+                        store.extractImageAnimData = c;
+                      }}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Typography variant="subtitle2" color="textSecondary">
+                      Include data
+                    </Typography>
+                  }
+                />
+              </Tooltip>
+              <Box />
+            </Box>
             <RadioGroup
               row
               value={extractImageFormat}

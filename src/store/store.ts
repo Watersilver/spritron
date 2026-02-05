@@ -131,6 +131,8 @@ type Store = {
   };
   extractImage: null | "start" | "inProgress";
   extractImageFormat: "png" | "jpg" | "webp";
+  extractImageTrim: boolean;
+  extractImageAnimData: boolean;
   // selectedAnimationObj: Animation | null;
 };
 
@@ -178,7 +180,9 @@ const store = proxify<Store>({
     selectedMimic: "rgba(144, 202, 249, 0.16) solid 8px"
   },
   extractImage: null,
-  extractImageFormat: "png"
+  extractImageFormat: "png",
+  extractImageTrim: false,
+  extractImageAnimData: true
   // selectedAnimationObj: null
 });
 // Initialize colours
