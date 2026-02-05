@@ -98,6 +98,7 @@ function FrameOptions({
           }}
         >
           <Tooltip
+            disableInteractive
             title="Determines how long this frame lasts for the current fps. e.g. if this value is 2 and fps is 24 then this frame lasts for 2/24 seconds."
           >
             <TextField

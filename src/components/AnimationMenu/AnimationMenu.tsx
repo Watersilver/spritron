@@ -161,6 +161,7 @@ function AnimationOptions({
                 label={"FPS"}
               />
               <Tooltip
+                disableInteractive
                 title="How many columns there are before it wraps"
               >
                 <TextField
@@ -314,6 +315,7 @@ function AnimationOptions({
                 a.pingPong
                 ? <>
                   <Tooltip
+                    disableInteractive
                     title="Controls if first frame is repeated when ping ponging animation"
                   >
                     <FormControlLabel
@@ -338,6 +340,7 @@ function AnimationOptions({
                     />
                   </Tooltip>
                   <Tooltip
+                    disableInteractive
                     title="Controls if last frame is repeated when ping ponging animation"
                   >
                     <FormControlLabel

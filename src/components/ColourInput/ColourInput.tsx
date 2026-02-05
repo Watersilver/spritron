@@ -143,6 +143,7 @@ function ColourInput({
       defThresVal.current !== undefined
       ? <>
         <Tooltip
+          disableInteractive
           title="Threshold"
           placement="top"
         >

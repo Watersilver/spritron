@@ -227,7 +227,7 @@ function ImageFramesEditor({
                 >
                   <CallMergeIcon />
                 </IconButton>
-                <Tooltip title="merge padding and offset">
+                <Tooltip disableInteractive title="merge padding and offset">
                   <IconButton
                     size="small"
                     sx={{
@@ -281,7 +281,7 @@ function ImageFramesEditor({
                 >
                   <CallSplitIcon />
                 </IconButton>
-                <Tooltip title="unmerge padding and offset">
+                <Tooltip disableInteractive title="unmerge padding and offset">
                   <IconButton
                     size="small"
                     sx={{

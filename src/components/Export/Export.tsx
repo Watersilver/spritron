@@ -62,6 +62,7 @@ function Export({
       }}
     >
       <Tooltip
+        disableInteractive
         title="Exports a json of all animations"
         placement={tooltipPlacement}
       >
@@ -153,6 +154,7 @@ function Export({
         </MenuItem>
       </Tooltip>
       <Tooltip
+        disableInteractive
         title="Exports image of currently selected animation"
         placement={tooltipPlacement}
       >
@@ -178,6 +180,7 @@ function Export({
               }}
             >
               <Tooltip
+                disableInteractive
                 title="Trims the outside layer of padding"
               >
                 <FormControlLabel
@@ -200,6 +203,7 @@ function Export({
                 />
               </Tooltip>
               <Tooltip
+                disableInteractive
                 title="Includes json with animation data"
               >
                 <FormControlLabel
@@ -241,11 +245,15 @@ function Export({
         </MenuItem>
       </Tooltip>
       <Tooltip
+        disableInteractive
         title="Exports gif of currently selected animation"
         placement={tooltipPlacement}
       >
         <MenuItem
           disabled={!isAnimValid || processing}
+          // TODO:
+          // https://jnordberg.github.io/gif.js/
+          // https://github.com/mattdesl/gifenc
         >
           <ListItemText
             primary="Gif Export"
