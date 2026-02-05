@@ -125,7 +125,7 @@ function AnimationOptions({
         // sx={theme => ({
         sx={{
           // Mimic button selection
-          borderLeft: "rgba(144, 202, 249, 0.16) solid 8px"
+          borderLeft: store.colours.selectedMimic
         }}
         // })}
       >
@@ -141,7 +141,7 @@ function AnimationOptions({
               sx={{
                 display: "grid",
                 gridTemplateColumns: '1fr 1fr',
-                rowGap: 1
+                gap: 1
               }}
             >
               <TextField
@@ -222,13 +222,17 @@ function AnimationOptions({
                 sx={{mr: 0}}
                 control={
                   <Checkbox
-                    value={a.transfrom?.mirror?.x ?? false}
+                    checked={!!a.transfrom?.mirror?.x}
                     onChange={(_, c) => {
                       const anim = store.animations.find(an => an.id === a.id);
                       if (!anim) return;
-                      anim.transfrom = anim.transfrom ?? {};
-                      anim.transfrom.mirror = anim.transfrom.mirror ?? {x: false, y: false};
-                      anim.transfrom.mirror.x = c;
+                      if (!anim.transfrom) {
+                        anim.transfrom = {mirror: {x: c, y: false}};
+                      } else if (!anim.transfrom.mirror) {
+                        anim.transfrom.mirror = {x: c, y: false};
+                      } else {
+                        anim.transfrom.mirror.x = c;
+                      }
                     }}
                     size="small"
                   />
@@ -243,13 +247,17 @@ function AnimationOptions({
                 sx={{mr: 0}}
                 control={
                   <Checkbox
-                    value={a.transfrom?.mirror?.y ?? false}
+                    checked={!!a.transfrom?.mirror?.y}
                     onChange={(_, c) => {
                       const anim = store.animations.find(an => an.id === a.id);
                       if (!anim) return;
-                      anim.transfrom = anim.transfrom ?? {};
-                      anim.transfrom.mirror = anim.transfrom.mirror ?? {x: false, y: false};
-                      anim.transfrom.mirror.y = c;
+                      if (!anim.transfrom) {
+                        anim.transfrom = {mirror: {x: false, y: c}};
+                      } else if (!anim.transfrom.mirror) {
+                        anim.transfrom.mirror = {x: false, y: c};
+                      } else {
+                        anim.transfrom.mirror.y = c;
+                      }
                     }}
                     size="small"
                   />
@@ -264,7 +272,7 @@ function AnimationOptions({
                 sx={{mr: 0}}
                 control={
                   <Checkbox
-                    value={a.loop ?? false}
+                    checked={!!a.loop}
                     onChange={(_, c) => {
                       const anim = store.animations.find(an => an.id === a.id);
                       if (!anim) return;
@@ -280,24 +288,82 @@ function AnimationOptions({
                 }
               />
               <FormControlLabel
-                sx={{mr: 0}}
+                sx={{
+                  mr: 0
+                }}
                 control={
                   <Checkbox
-                    value={a.pingPong ?? false}
+                    checked={!!a.pingPong}
                     onChange={(_, c) => {
                       const anim = store.animations.find(an => an.id === a.id);
                       if (!anim) return;
-                      anim.pingPong = c;
+                      if (!c) anim.pingPong = undefined;
+                      else anim.pingPong = {};
+                      store.preview.frame = 0;
                     }}
                     size="small"
                   />
                 }
                 label={
-                  <Typography variant="subtitle2" color="textSecondary">
+                  <Typography variant="subtitle2" color="textSecondary" sx={{width: "1px"}}>
                     Ping pong
                   </Typography>
                 }
               />
+              {
+                a.pingPong
+                ? <>
+                  <Tooltip
+                    title="Controls if first frame is repeated when ping ponging animation"
+                  >
+                    <FormControlLabel
+                      sx={{mr: 0}}
+                      control={
+                        <Checkbox
+                          checked={!a.pingPong.noFirst}
+                          onChange={(_, c) => {
+                            const anim = store.animations.find(an => an.id === a.id);
+                            if (!anim || !anim.pingPong) return;
+                            anim.pingPong.noFirst = !c;
+                            store.preview.frame = 0;
+                          }}
+                          size="small"
+                        />
+                      }
+                      label={
+                        <Typography variant="subtitle2" color="textSecondary" sx={{width: "1px"}}>
+                          repeat first
+                        </Typography>
+                      }
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    title="Controls if last frame is repeated when ping ponging animation"
+                  >
+                    <FormControlLabel
+                      sx={{mr: 0}}
+                      control={
+                        <Checkbox
+                          checked={!a.pingPong.noLast}
+                          onChange={(_, c) => {
+                            const anim = store.animations.find(an => an.id === a.id);
+                            if (!anim || !anim.pingPong) return;
+                            anim.pingPong.noLast = !c;
+                            store.preview.frame = 0;
+                          }}
+                          size="small"
+                        />
+                      }
+                      label={
+                        <Typography variant="subtitle2" color="textSecondary" sx={{width: "1px"}}>
+                          repeat last
+                        </Typography>
+                      }
+                    />
+                  </Tooltip>
+                </>
+                : null
+              }
             </Box>
           </CardContent>
         </Card>

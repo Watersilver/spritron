@@ -2,6 +2,7 @@ import { Box, IconButton, type Theme, type SxProps } from "@mui/material"
 import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
 import store, { useWatch } from "../../store/store";
 import ColourInput from "../ColourInput/ColourInput";
+import Export from "../Export/Export";
 
 // ? info: how and when to refresh
 // explain that one might need to change relative paths in json depending on folder structure
@@ -24,7 +25,18 @@ function MenuBar({
         gridTemplateColumns: "auto 1fr auto auto"
       }}
     >
-      <Box></Box>
+      <Export
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "left"
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "left"
+        }}
+        tooltipPlacement="right"
+        sx={{fontWeight: 700}}
+      />
       <Box></Box>
       <ColourInput
         title="bg colour"

@@ -49,10 +49,7 @@ type Animation = {
   }[];
   fps: number;
   loop?: boolean;
-  pingPong?: boolean;
-  // Do not apply these settings to texture itself,
-  // because the user could easily do it themself
-  // with something like gimp
+  pingPong?: {noFirst?: boolean; noLast?: boolean};
   colorTransform?: ColorTransform;
   padding: number;
   columnLimit: number;
@@ -110,6 +107,10 @@ type Store = {
     } | null;
     mousePos: {x: number; y: number;};
   };
+  preview: {
+    playing: boolean;
+    frame: number;
+  };
   selectedImage: string | null;
   selectedFrames: number | null;
   selectedAnimation: number | null;
@@ -126,7 +127,10 @@ type Store = {
     selectedFrame: string;
     margin: string;
     guides: string;
+    selectedMimic: string;
   };
+  extractImage: null | "start" | "inProgress";
+  extractImageFormat: "png" | "jpg" | "webp";
   // selectedAnimationObj: Animation | null;
 };
 
@@ -150,6 +154,10 @@ const store = proxify<Store>({
     grabbedFrame: null,
     mousePos: {x: 0, y: 0}
   },
+  preview: {
+    playing: false,
+    frame: 0
+  },
   animations: [],
   selectedImage: null,
   selectedFrames: null,
@@ -167,7 +175,10 @@ const store = proxify<Store>({
     selectedFrame: "#f00",
     margin: "#A464CB",
     guides: "#0f0",
+    selectedMimic: "rgba(144, 202, 249, 0.16) solid 8px"
   },
+  extractImage: null,
+  extractImageFormat: "png"
   // selectedAnimationObj: null
 });
 // Initialize colours

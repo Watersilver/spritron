@@ -1,6 +1,6 @@
-import { Autocomplete, Box, Card, CardContent, Checkbox, FormControlLabel, TextField, Tooltip, Typography, type SxProps, type Theme } from "@mui/material";
+import { Autocomplete, Box, Button, Card, CardActions, CardContent, Checkbox, FormControlLabel, TextField, Tooltip, Typography, type SxProps, type Theme } from "@mui/material";
 import store, { useWatch } from "../../store/store";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { deproxify } from "../../libs/proxy-state";
 
 // TODO: how can the user know what pressing control click does?
@@ -49,6 +49,25 @@ function FrameOptions({
   const mirrorX = getUnifiedValue(selAnFr, f => !!f.transfrom?.mirror?.x, null);
   const mirrorY = getUnifiedValue(selAnFr, f => !!f.transfrom?.mirror?.y, null);
 
+  const deleteFrames = useCallback(() => {
+    const sa = store.animations.find(a => a.id === store.selectedAnimation);
+    if (!sa || sa.frames.length === 0 || selAnFr.length === 0) return;
+    sa.frames = sa.frames.filter(f => !selAnFr.some(fr => fr.id === f.id));
+    store.preview.frame = 0;
+  }, [selAnFr]);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Delete") {
+        deleteFrames();
+      }
+    }
+
+    window.addEventListener("keydown", h);
+
+    return () => window.removeEventListener("keydown", h);
+  }, [deleteFrames]);
+
   return <Box
     sx={sx}
     style={style}
@@ -57,7 +76,8 @@ function FrameOptions({
       sx={{
         borderRadius: 0,
         border: 0,
-        minHeight: "100%"
+        minHeight: "100%",
+        position: "relative"
       }}
       variant="outlined"
     >
@@ -103,7 +123,7 @@ function FrameOptions({
               }}
               label="Duration"
               slotProps={{ inputLabel: { shrink: true } }}
-              disabled={!selAnFr}
+              disabled={selAnFr.length === 0}
             />
           </Tooltip>
           <Autocomplete
@@ -131,7 +151,61 @@ function FrameOptions({
             getOptionLabel={v => {
               return v + "°";
             }}
-            disabled={!selAnFr}
+            disabled={selAnFr.length === 0}
+          />
+          <Typography
+            color="textSecondary"
+            sx={{
+              gridColumn: "-1 / 1"
+            }}
+          >
+            Offset
+          </Typography>
+          <TextField
+            value={getUnifiedValue(selAnFr, f => f.offset.x, "")}
+            size="small"
+            sx={{
+              width: "5em"
+            }}
+            onChange={e => {
+              if (safIds === null) return;
+              const fr = getSelectedFrames(selAnId, safIds);
+              if (!fr) return;
+              const v = Number(e.target.value);
+              fr.forEach(f => {
+                if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
+                  f.offset.x = 0;
+                } else {
+                  f.offset.x = Math.floor(v);
+                }
+              });
+            }}
+            label={"x"}
+            slotProps={{ inputLabel: { shrink: true } }}
+            disabled={selAnFr.length === 0}
+          />
+          <TextField
+            value={getUnifiedValue(selAnFr, f => f.offset.y, "")}
+            size="small"
+            sx={{
+              width: "5em"
+            }}
+            onChange={e => {
+              if (safIds === null) return;
+              const fr = getSelectedFrames(selAnId, safIds);
+              if (!fr) return;
+              const v = Number(e.target.value);
+              fr.forEach(f => {
+                if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
+                  f.offset.y = 0;
+                } else {
+                  f.offset.y = Math.floor(v);
+                }
+              })
+            }}
+            label={"y"}
+            slotProps={{ inputLabel: { shrink: true } }}
+            disabled={selAnFr.length === 0}
           />
           <FormControlLabel
             sx={{mr: 0}}
@@ -161,7 +235,7 @@ function FrameOptions({
                 Mirror
               </Typography>
             }
-            disabled={!selAnFr}
+            disabled={selAnFr.length === 0}
           />
           <FormControlLabel
             sx={{mr: 0}}
@@ -191,66 +265,24 @@ function FrameOptions({
                 Flip
               </Typography>
             }
-            disabled={!selAnFr}
-          />
-          <Typography
-            sx={{
-              gridColumn: "-1 / 1"
-            }}
-            color="textSecondary"
-          >
-            Offset
-          </Typography>
-          <TextField
-            value={getUnifiedValue(selAnFr, f => f.offset.x, "")}
-            size="small"
-            sx={{
-              width: "5em",
-              gridColumn: "-1 / 1"
-            }}
-            onChange={e => {
-              if (safIds === null) return;
-              const fr = getSelectedFrames(selAnId, safIds);
-              if (!fr) return;
-              const v = Number(e.target.value);
-              fr.forEach(f => {
-                if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
-                  f.offset.x = 0;
-                } else {
-                  f.offset.x = Math.floor(v);
-                }
-              });
-            }}
-            label={"x"}
-            slotProps={{ inputLabel: { shrink: true } }}
-            disabled={!selAnFr}
-          />
-          <TextField
-            value={getUnifiedValue(selAnFr, f => f.offset.y, "")}
-            size="small"
-            sx={{
-              width: "5em",
-              gridColumn: "-1 / 1"
-            }}
-            onChange={e => {
-              if (safIds === null) return;
-              const fr = getSelectedFrames(selAnId, safIds);
-              if (!fr) return;
-              const v = Number(e.target.value);
-              fr.forEach(f => {
-                if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
-                  f.offset.y = 0;
-                } else {
-                  f.offset.y = Math.floor(v);
-                }
-              })
-            }}
-            label={"y"}
-            slotProps={{ inputLabel: { shrink: true } }}
-            disabled={!selAnFr}
+            disabled={selAnFr.length === 0}
           />
         </Box>
       </CardContent>
+      <CardActions
+        sx={{
+          position: "absolute",
+          bottom: 0
+        }}
+      >
+        <Button
+          color="error"
+          disabled={selAnFr.length === 0}
+          onClick={deleteFrames}
+        >
+          Delete Frame{selAnFr.length < 2 ? "" : "s"}
+        </Button>
+      </CardActions>
     </Card>
   </Box>
 }

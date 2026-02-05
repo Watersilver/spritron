@@ -5,7 +5,7 @@
 import "./libs/proxy-state/tests"
 
 
-import { Box, createTheme, CssBaseline, ThemeProvider, Typography, type SxProps, type Theme } from "@mui/material";
+import { Box, createTheme, CssBaseline, IconButton, Stack, ThemeProvider, Typography, type SxProps, type Theme } from "@mui/material";
 import TextureLoader from "./components/TextureLoader/TextureLoader";
 import { useState } from "react";
 import TextureDisplayer from "./components/TextureDisplayer/TextureDisplayer";
@@ -15,6 +15,10 @@ import { deproxify } from "./libs/proxy-state";
 import AnimationMenu from "./components/AnimationMenu/AnimationMenu";
 import FrameOptions from "./components/FrameOptions/FrameOptions";
 // import store, { useWatch } from "./store/store";
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import PauseIcon from '@mui/icons-material/Pause';
+// import Export from "./components/Export/Export";
 
 const darkTheme = createTheme({
   palette: {
@@ -28,15 +32,58 @@ function CoordsTracker({
   sx?: SxProps<Theme>
 }) {
   const mousePos = useWatch(() => store.workArea.mousePos, () => deproxify(store.workArea.mousePos));
-  const yomama = useWatch(() => store.workArea.mousePos, () => deproxify(store.animFrames.mousePos));
 
   return <Box sx={sx}>
     <Typography variant="subtitle2" color="textSecondary">
       [{Math.floor(mousePos.x)},{Math.floor(mousePos.y)}]
     </Typography>
-    <Typography variant="subtitle2" color="textSecondary">
-      [{Math.floor(yomama.x)},{Math.floor(yomama.y)}]
-    </Typography>
+  </Box>;
+}
+
+const playstop = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  store.preview.playing = !store.preview.playing;
+  const a = store.animations.find(a => a.id === store.selectedAnimation);
+  if (a && a.frames.length - 1 + (a.pingPong ? a.frames.length : 0) - (a.pingPong?.noFirst ? 1 : 0) - (a.pingPong?.noLast ? 1 : 0) <= store.preview.frame) {
+    store.preview.frame = 0;
+  }
+}
+
+function PreviewControls({
+  sx
+}: {
+  sx?: SxProps<Theme>
+}) {
+  const p = useWatch(() => store.preview.playing, () => store.preview.playing);
+
+  return <Box sx={sx}>
+    <Stack
+      direction="row"
+      sx={{
+        background: "linear-gradient(#0000, #000A)"
+      }}
+    >
+      <IconButton
+        sx={{borderRadius: 0}}
+        onClick={playstop}
+      >
+        {
+          p
+          ? <PauseIcon />
+          : <PlayArrowIcon />
+        }
+      </IconButton>
+      <IconButton
+        sx={{borderRadius: 0}}
+        onClick={e => {
+          e.stopPropagation();
+          store.preview.frame = 0;
+          store.preview.playing = false;
+        }}
+      >
+        <StopIcon />
+      </IconButton>
+    </Stack>
   </Box>
 }
 
@@ -210,16 +257,53 @@ function App() {
                     setPreviewElement(e);
                   }
                 }}
-              />
+                sx={{
+                  position: "relative",
+                  pointerEvents: "auto",
+                  "--prev-hov-op": 0,
+                  "&:hover": {
+                    "--prev-hov-op": 1
+                  }
+                }}
+                onClick={playstop}
+              >
+                <PreviewControls
+                  sx={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    opacity: "var(--prev-hov-op)",
+                    transition: "opacity 0.1s",
+                    width: "100%"
+                  }}
+                />
+              </Box>
             </Box>
           </Box> : null}
-          <CoordsTracker
+          <Stack
             sx={theme => ({
               gridArea: "d",
+              position: 'relative',
+              pointerEvents: "auto",
               backgroundColor: theme.palette.background.default,
-              pointerEvents: "auto"
             })}
-          />
+            direction='row'
+            justifyContent="space-between"
+            alignItems="end"
+          >
+            <CoordsTracker />
+            {/* <Export
+              anchorOrigin={{
+                vertical: "top",
+                horizontal: "right"
+              }}
+              transformOrigin={{
+                vertical: "bottom",
+                horizontal: "right"
+              }}
+              tooltipPlacement="left"
+            /> */}
+          </Stack>
           {/* <Box>
             <Button onClick={() => setShow(p=>!p)}>{show ? "Hide" : "Show"}</Button>
             {show ? <TextureDisplayer /> : null}

@@ -37,7 +37,7 @@ function TransparencyMapping({
           return <ListItem
             key={tc[2]}
             sx={{
-              borderLeft: "rgba(144, 202, 249, 0.16) solid 8px"
+              borderLeft: store.colours.selectedMimic
             }}
           >
             <ColourInput
@@ -551,7 +551,7 @@ function TextureLoader({
                   // sx={theme => ({
                   sx={{
                     // Mimic button selection
-                    borderLeft: "rgba(144, 202, 249, 0.16) solid 8px"
+                    borderLeft: store.colours.selectedMimic
                   }}
                   // })}
                 >

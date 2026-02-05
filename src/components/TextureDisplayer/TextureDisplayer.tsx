@@ -1,4 +1,4 @@
-import { autoDetectRenderer, Container, FederatedPointerEvent, Filter, Graphics, Rectangle, Sprite, Texture, type ColorSource, type Renderer } from "pixi.js";
+import { autoDetectRenderer, Container, FederatedPointerEvent, Filter, Graphics, Rectangle, Sprite, Texture, type ColorSource, type ImageLike, type Renderer } from "pixi.js";
 import { useEffect, useRef, useState } from "react";
 import useResource from "../../utils/useResource";
 import store, { ImageAsset, useWatch } from "../../store/store";
@@ -6,7 +6,10 @@ import { Box, type SxProps, type Theme } from "@mui/material";
 import { deproxify } from "../../libs/proxy-state";
 
 
-let aniFrame = 0;
+
+const downloadLink = document.createElement("a");
+let prevImage: ImageLike | null = null;
+
 let prevTime = -1;
 
 const selAnimFramesData: {w: number; h: number; frames: {x: number; y: number; id: number;}[]} = {w: 0, h: 0, frames: []};
@@ -15,10 +18,68 @@ const workAreaTransCache: {[image: string]: {x: number; y: number; scale: number
 
 const transFilters: {[image: string]: Filter & {[isTransFilter]?: boolean}} = {};
 const isTransFilter = Symbol();
+const vertex = `
+  in vec2 aPosition;
+  out vec2 vTextureCoord;
+
+  uniform vec4 uInputSize;
+  uniform vec4 uOutputFrame;
+  uniform vec4 uOutputTexture;
+
+  vec4 filterVertexPosition( void )
+  {
+      vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
+      
+      position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+      position.y = position.y * (2.0*uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+
+      return vec4(position, 0.0, 1.0);
+  }
+
+  vec2 filterTextureCoord( void )
+  {
+      return aPosition * (uOutputFrame.zw * uInputSize.zw);
+  }
+
+  void main(void)
+  {
+      gl_Position = filterVertexPosition();
+      vTextureCoord = filterTextureCoord();
+  }
+`;
+// const fragment = `
+//   in vec2 vTextureCoord;
+
+//   uniform sampler2D uTexture;
+
+//   void main(void)
+//   {
+//     vec4 c = texture2D(uTexture, vTextureCoord);
+
+//     gl_FragColor = vec4(c.r,c.g,c.b,c.a * 0.5);
+//   }
+// `;
+// const alphaFilter = Filter.from({
+//   gl: {fragment, vertex},
+//   gpu: {fragment: {source: fragment}, vertex: {source: vertex}}
+// });
 
 const getFrameData = (anim: typeof store.animations[number], frame: number) => {
-  // TODO: handle ghost frames
-  return anim.frames[frame];
+  let fd = anim.frames[frame];
+  if (fd) return {...fd, ghost: false};
+  if (anim.pingPong) {
+    frame -= anim.frames.length;
+    const fr = [...anim.frames];
+    if (anim.pingPong.noLast) {
+      fr.pop();
+    }
+    if (anim.pingPong.noFirst) {
+      fr.shift();
+    }
+    fr.reverse();
+    fd = fr[frame];
+  }
+  if (fd) return {...fd, ghost: true};
 };
 
 const getPixelColor = (renderer: Renderer, p: {x: number; y: number;}, container: Container) => {
@@ -45,35 +106,35 @@ function generateTransFilters(maps: typeof store.transMaps) {
     delete transFilters[im];
   }
 
-  const vertex = `
-    in vec2 aPosition;
-    out vec2 vTextureCoord;
+  // const vertex = `
+  //   in vec2 aPosition;
+  //   out vec2 vTextureCoord;
 
-    uniform vec4 uInputSize;
-    uniform vec4 uOutputFrame;
-    uniform vec4 uOutputTexture;
+  //   uniform vec4 uInputSize;
+  //   uniform vec4 uOutputFrame;
+  //   uniform vec4 uOutputTexture;
 
-    vec4 filterVertexPosition( void )
-    {
-        vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
+  //   vec4 filterVertexPosition( void )
+  //   {
+  //       vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
         
-        position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
-        position.y = position.y * (2.0*uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+  //       position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+  //       position.y = position.y * (2.0*uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
 
-        return vec4(position, 0.0, 1.0);
-    }
+  //       return vec4(position, 0.0, 1.0);
+  //   }
 
-    vec2 filterTextureCoord( void )
-    {
-        return aPosition * (uOutputFrame.zw * uInputSize.zw);
-    }
+  //   vec2 filterTextureCoord( void )
+  //   {
+  //       return aPosition * (uOutputFrame.zw * uInputSize.zw);
+  //   }
 
-    void main(void)
-    {
-        gl_Position = filterVertexPosition();
-        vTextureCoord = filterTextureCoord();
-    }
-  `;
+  //   void main(void)
+  //   {
+  //       gl_Position = filterVertexPosition();
+  //       vTextureCoord = filterTextureCoord();
+  //   }
+  // `;
 
   for (const [im, cols] of Object.entries(maps)) {
     if (cols.length === 0) continue;
@@ -167,7 +228,7 @@ function TextureDisplayer({
   style,
   workAreaElement,
   animFramesElement,
-  previewElement
+  previewElement,
 }: {
   sx?: SxProps<Theme>;
   style?: React.CSSProperties;
@@ -341,7 +402,8 @@ function TextureDisplayer({
   const selectedAnimationId = useWatch(() => store.selectedAnimation, () => store.selectedAnimation);
 
   useEffect(() => {
-    aniFrame = 0;
+    store.preview.frame = 0;
+    store.preview.playing = true;
   }, [selectedAnimationId]);
 
   const transMaps = useWatch(() => store.transMaps, () => deproxify(store.transMaps));
@@ -384,12 +446,32 @@ function TextureDisplayer({
       resources.push([s,t]);
     }
     const newAnimFrames = resources.map(r => r[0]);
-    for (const anim of newAnimFrames) {
-      scene.animFrames.addChild(anim);
+    for (const frame of newAnimFrames) {
+      scene.animFrames.addChild(frame);
     }
     dontFuckShitUpWithScale.current = true;
 
+    const ghostFrames: (Sprite & {ghost?: undefined;})[] = [];
+    if (a.pingPong) {
+      const start = resources.length - (a.pingPong.noLast ? 2 : 1);
+      const end = a.pingPong.noFirst ? 1 : 0;
+      for (let i = start; i >= end; i--) {
+        const r = resources[i];
+        if (r) {
+          ghostFrames.push(new Sprite(r[1]));
+        }
+      }
+    }
+    for (const frame of ghostFrames) {
+      frame.ghost = undefined;
+      scene.animFrames.addChild(frame);
+    }
+
     return () => {
+      for (const f of ghostFrames) {
+        f.removeFromParent();
+        f.destroy();
+      }
       for (const r of resources) {
         r[0].removeFromParent();
         r[0].destroy();
@@ -504,6 +586,22 @@ function TextureDisplayer({
         scene.animFramesMask
         .rect(rect.x, rect.y, size.inlineSize, size.blockSize)
         .fill(0xffffff);
+
+        // previewElement sometimes doesn't resize
+        // Sometimes it only changes its position
+        // Since animFramesElement always resizes resize preview element here too
+        if (previewElement) {
+          const rect = previewElement.getBoundingClientRect();
+          scene.preview.x = rect.x;
+          scene.preview.y = rect.y;
+
+          scene.previewSpritePos.x = rect.width * 0.5;
+          scene.previewSpritePos.y = rect.height * 0.5;
+          scene.previewMask.clear();
+          scene.previewMask
+          .rect(rect.x, rect.y, rect.width, rect.height)
+          .fill(0xffffff);
+        }
       }
     });
 
@@ -797,7 +895,7 @@ function TextureDisplayer({
         // Animation frames container positioning
         const sa = store.selectedAnimation;
         const anim = store.animations.find(a => a.id === sa);
-        const frames = scene.animFrames.children;
+        const frames = scene.animFrames.children.filter(f => !("ghost" in f));
         const af = scene.animFrames;
         if (sa !== null && anim) {
           const tallest = frames.reduce((a,c,i) => {
@@ -883,8 +981,8 @@ function TextureDisplayer({
           scene.animFramesGrabbed.position = scene.animFrames.position;
           scene.animFramesGrabbed.scale = scene.animFrames.scale;
           scene.animFramesGrabbedSprite.texture = Texture.EMPTY;
-          for (let i = 0; i < frames.length; i++) {
-            const f = frames[i] as Sprite | undefined;
+          for (let i = 0; i < scene.animFrames.children.length; i++) {
+            const f = scene.animFrames.children[i] as Sprite | undefined;
             const fd = getFrameData(anim, i);
             if (!f || !f.parent || !fd) continue;
             const angle = globalAngle + (fd.transfrom?.rotation ?? 0);
@@ -893,7 +991,7 @@ function TextureDisplayer({
               y: globalMirror.y !== (fd.transfrom?.mirror?.y ?? false)
             };
             let j = i;
-            if (shuffleFromGrab) {
+            if (shuffleFromGrab && !fd.ghost) {
               if (j >= i1 && j <= i2) {
                 j--;
               } else if (j <= i1 && j >= i2) {
@@ -921,7 +1019,7 @@ function TextureDisplayer({
               }
             }
 
-            if (fd.id === store.animFrames.grabbedFrame?.id) {
+            if (fd.id === store.animFrames.grabbedFrame?.id && !fd.ghost) {
               f.alpha = 0;
               scene.animFramesGrabbedSprite.texture = f.texture;
               scene.animFramesGrabbedSprite.x = store.animFrames.mousePos.x + store.animFrames.grabbedFrame.offset.x;
@@ -940,6 +1038,15 @@ function TextureDisplayer({
               }
             } else {
               f.alpha = 1;
+              // if (fd.ghost) {
+              //   if (!f.filters) {
+              //     f.filters = [alphaFilter];
+              //   } else if (!f.filters.some(filter => alphaFilter === filter)) {
+              //     f.filters = [...f.filters, alphaFilter];
+              //   }
+              // } else if (f.filters?.some(f => f === alphaFilter)) {
+              //   f.filters = f.filters.filter(filter => filter !== alphaFilter);
+              // }
             }
           }
 
@@ -1030,7 +1137,6 @@ function TextureDisplayer({
                 if (f) {
                   selAnimFramesData.frames.push({x,y,id: f.id});
                   id = f.id;
-                  // TODO: what do about ghosts
                 }
                 if (store.selectedAnimFrames[sa]?.some(saf => saf === f?.id)) {
                   sDim.push([x,y,w,h]);
@@ -1104,9 +1210,9 @@ function TextureDisplayer({
             }
           }
 
-          aniFrame = frames.length === 0 ? 0 : aniFrame % frames.length;
-          const i = Math.floor(aniFrame);
-          const f = frames[i];
+          store.preview.frame = scene.animFrames.children.length <= 1 ? 0 : store.preview.frame % (scene.animFrames.children.length);
+          const i = Math.floor(store.preview.frame);
+          const f = scene.animFrames.children[i];
           const fd = getFrameData(anim, i);
             // f.x = col * (widest + anim.padding) + anim.padding + Math.floor(w * 0.5) + fd.offset.x;
             // f.y = row * (tallest + anim.padding) + anim.padding + Math.floor(h * 0.5) + fd.offset.y;
@@ -1164,7 +1270,7 @@ function TextureDisplayer({
               }
             }
 
-            
+
             const transFilter = transFilters[fd.image];
             if (transFilter) {
               if (!scene.preview.filters) {
@@ -1173,6 +1279,22 @@ function TextureDisplayer({
                 scene.preview.filters = [...scene.preview.filters, transFilter];
               }
             }
+
+            if (store.preview.playing) {
+              const prevF = store.preview.frame;
+              store.preview.frame += Math.min(1, dt * anim.fps / fd.durationFactor);
+              if (prevF > store.preview.frame % scene.animFrames.children.length) {
+                if (!anim.loop) {
+                  store.preview.playing = false;
+                  store.preview.frame = prevF;
+                }
+              }
+            }
+          }
+
+          // Make sure things don't break (had a bug and couldn't reproduce)
+          if (Number.isNaN(store.preview.frame) || !Number.isFinite(store.preview.frame)) {
+            store.preview.frame = 0;
           }
 
           // Determine scale
@@ -1181,7 +1303,38 @@ function TextureDisplayer({
             scene.previewSpritePos.scale = Math.min(width / widest, height / tallest);
           }
 
-          aniFrame += dt * anim.fps;
+
+
+          // Exports
+          if (store.extractImage === "start") {
+            store.extractImage = "inProgress";
+
+            const l = scene.animFrames.children.length;
+            const cols = Math.min(l, anim.columnLimit);
+            const rows = Math.floor((l - 1) / anim.columnLimit) + 1;
+            const p = anim.padding;
+
+            renderer.extract.image({
+              target: af,
+              frame: new Rectangle(
+                0, 0,
+                p + cols * (widest + p),
+                p + rows * (tallest + p),
+              ),
+              format: store.extractImageFormat
+            }).then((i) => {
+              prevImage?.remove();
+              prevImage = i;
+              if (i instanceof HTMLElement) {
+                // TODO: bundle with json that contains anim duractions?
+                downloadLink.href = i.src;
+                downloadLink.download = anim.name;
+                // Why?? https://stackoverflow.com/a/65939108
+                // downloadLink.dataset.downloadurl = ["image/" + store.extractImageFormat, downloadLink.download, downloadLink.href].join(":");
+                downloadLink.click();
+              }
+            }).finally(() => store.extractImage = null);
+          }
         }
 
 
@@ -1258,6 +1411,7 @@ function TextureDisplayer({
                   store.selectedAnimFrames[store.selectedAnimation] = [store.nextAnimationFrameId];
                 // }
                 store.nextAnimationFrameId++;
+                store.preview.frame = 0;
               }
             }
           }
@@ -1347,6 +1501,7 @@ function TextureDisplayer({
               }
             }
             selAn.frames = frs;
+            store.preview.frame = 0;
           }
         }
         store.animFrames.pointing.id = store.animFrames.grabbedFrame.id;
