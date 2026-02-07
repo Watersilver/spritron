@@ -244,23 +244,30 @@ function Export({
           </Stack>
         </MenuItem>
       </Tooltip>
-      <Tooltip
+      {/* 
+        Pain in the ass.
+        Leave it here in case I make it in the future
+      */}
+      {/* <Tooltip
         disableInteractive
         title="Exports gif of currently selected animation"
         placement={tooltipPlacement}
       >
         <MenuItem
           disabled={!isAnimValid || processing}
-          // TODO:
-          // https://jnordberg.github.io/gif.js/
-          // https://github.com/mattdesl/gifenc
+          
+          onClick={() => {
+            setProcessing(true);
+
+            setOpen(false);
+          }}
         >
           <ListItemText
             primary="Gif Export"
             secondary={!anim ? "*Select an animation" : isAnimValid ? "*Frame duration is not taken into account" : "*Animation is empty"}
           />
         </MenuItem>
-      </Tooltip>
+      </Tooltip> */}
     </Menu>
   </>
 }
