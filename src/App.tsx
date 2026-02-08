@@ -303,6 +303,13 @@ function App() {
               }}
               tooltipPlacement="left"
             /> */}
+            <Typography
+              sx={{pr: 1}}
+              variant="subtitle2"
+              color="textDisabled"
+            >
+              Version 1.0
+            </Typography>
           </Stack>
           {/* <Box>
             <Button onClick={() => setShow(p=>!p)}>{show ? "Hide" : "Show"}</Button>
