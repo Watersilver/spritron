@@ -1,4 +1,4 @@
-import { Box, IconButton, type Theme, type SxProps, Typography, Stack, Popover, Link, Alert } from "@mui/material"
+import { Box, IconButton, type Theme, type SxProps, Typography, Stack, Popover, Link, Alert, Tooltip } from "@mui/material"
 import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
 // import InfoOutlineIcon from '@mui/icons-material/InfoOutline';
 import store, { useWatch } from "../../store/store";
@@ -7,13 +7,8 @@ import Export from "../Export/Export";
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useState } from "react";
 import ExportExplanation from "../ExportExplanation/ExportExplanation";
-
-// ? info: how and when to refresh
-// explain that one might need to change relative paths in json depending on folder structure
-// and that it(json) assumes all are in the same folder
-// That last one might be better moved to the export screen
-// {/* Note that too big images will fail to load */}
-
+// TODO: add ai joke
+import AutoAwesomeTwoToneIcon from '@mui/icons-material/AutoAwesomeTwoTone';
 
 
 const lineHeight = 1.2;
@@ -67,13 +62,19 @@ function MenuBar({
         </Typography>
         <br />
         <Typography>
-          Then <Link
+          Then <Tooltip title="Click for export docs and examples"><Link
             href="#"
             onClick={() => setExportExplainOpen(true)}
-          >export</Link>. You're <b><i>DONE!</i></b> God damnit, you're done.
+          >export</Link></Tooltip>. That's all!
         </Typography>
         <br />
-        {/* <br /> */}
+        <Alert
+          variant="outlined"
+          severity="warning"
+        >
+          The images you use shouldn't be too large or they will not load.
+        </Alert>
+        <br />
         <Alert
           variant="outlined" 
           severity="info"

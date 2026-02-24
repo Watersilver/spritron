@@ -418,7 +418,8 @@ function AnimationMenu({
                   name: "animation_" + i,
                   frames: [],
                   padding: 0,
-                  columnLimit: 20
+                  columnLimit: 20,
+                  loop: true
                 });
                 store.selectedAnimation = store.nextAnimationId;
                 store.nextAnimationId++;
