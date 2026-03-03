@@ -39,8 +39,8 @@ type Animation = {
     id: number;
     /** Base Texture that this frame uses */
     image: string;
-    /** This frame will last `durationFactor` frames */
-    durationFactor: number;
+    /** This frame will last `duration` frames */
+    duration: number;
     /** The actual part of the texture this frame uses */
     bounds: [x: number, y: number, w: number, h: number];
     offset: {x: number; y: number;};

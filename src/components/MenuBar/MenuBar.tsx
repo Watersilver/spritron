@@ -5,20 +5,21 @@ import store, { useWatch } from "../../store/store";
 import ColourInput from "../ColourInput/ColourInput";
 import Export from "../Export/Export";
 import SettingsIcon from '@mui/icons-material/Settings';
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ExportExplanation from "../ExportExplanation/ExportExplanation";
 // TODO: add ai joke
-import AutoAwesomeTwoToneIcon from '@mui/icons-material/AutoAwesomeTwoTone';
+// import AutoAwesomeTwoToneIcon from '@mui/icons-material/AutoAwesomeTwoTone';
 
 
 const lineHeight = 1.2;
+
+const startingHash = location.hash !== "";
 
 function MenuBar({
   sx
 }: {
   sx?: SxProps<Theme>
 }) {
-
   const [settingsAnchor, setSettingsAnchor] = useState<HTMLButtonElement | null>(null);
   const [helpAnchor, setHelpAnchor] = useState<HTMLButtonElement | null>(null);
   const bgc = useWatch(() => store.colours.canvas, () => store.colours.canvas);
@@ -27,12 +28,24 @@ function MenuBar({
   const mc = useWatch(() => store.colours.margin, () => store.colours.margin);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [exportExplainOpen, setExportExplainOpen] = useState(false);
+  const [exportExplainOpen, setExportExplainOpen] = useState(startingHash);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setExportExplainOpen(location.hash !== "");
+    };
+
+    addEventListener("hashchange", onHashChange);
+
+    return () => removeEventListener("hashchange", onHashChange);
+  }, []);
 
   return <>
     <ExportExplanation
       open={exportExplainOpen}
-      onClose={() => setExportExplainOpen(false)}
+      onClose={() => {
+        location.hash = "";
+      }}
     />
     <Popover
       open={helpOpen}
@@ -63,8 +76,7 @@ function MenuBar({
         <br />
         <Typography>
           Then <Tooltip title="Click for export docs and examples"><Link
-            href="#"
-            onClick={() => setExportExplainOpen(true)}
+            href="#intro"
           >export</Link></Tooltip>. That's all!
         </Typography>
         <br />

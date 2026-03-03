@@ -1283,7 +1283,7 @@ function TextureDisplayer({
 
             if (store.preview.playing) {
               const prevF = store.preview.frame;
-              store.preview.frame += Math.min(1, dt * anim.fps / fd.durationFactor);
+              store.preview.frame += Math.min(1, dt * anim.fps / fd.duration);
               if (prevF > store.preview.frame % scene.animFrames.children.length) {
                 if (!anim.loop) {
                   store.preview.playing = false;
@@ -1342,12 +1342,12 @@ function TextureDisplayer({
                     rows,
                     framesPerSecond: anim.fps,
                     loop: anim.loop,
-                    durationFactors:
+                    durations:
                       anim.pingPong
                       ? [
-                        ...anim.frames.map(f => f.durationFactor),
+                        ...anim.frames.map(f => f.duration),
                         ...(() => {
-                          const frs = [...anim.frames].reverse().map(f => f.durationFactor);
+                          const frs = [...anim.frames].reverse().map(f => f.duration);
                           if (anim.pingPong.noFirst) {
                             frs.pop();
                           }
@@ -1357,8 +1357,10 @@ function TextureDisplayer({
                           return frs;
                         })()
                       ]
-                      : anim.frames.map(f => f.durationFactor)
+                      : anim.frames.map(f => f.duration),
+                    framesLength: 1
                   };
+                  json.framesLength = json.durations.length;
                   zip.file(anim.name + ".json", JSON.stringify(json));
                   zip.generateAsync({type: "blob"})
                   .then(b => {
@@ -1435,7 +1437,7 @@ function TextureDisplayer({
                 a.frames.push({
                   id: store.nextAnimationFrameId,
                   image,
-                  durationFactor: 1,
+                  duration: 1,
                   offset: {
                     x: 0,
                     y: 0

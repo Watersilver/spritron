@@ -103,7 +103,7 @@ function FrameOptions({
           >
             <TextField
               value={getUnifiedValue(selAnFr, f => {
-                let df = f.durationFactor.toString();
+                let df = f.duration.toString();
                 if (!df.includes(".")) {
                   df += ".0";
                 }
@@ -117,9 +117,9 @@ function FrameOptions({
                 if (!f) return;
                 const v = Number(e.target.value);
                 if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
-                  f.forEach(fr => fr.durationFactor = 0);
+                  f.forEach(fr => fr.duration = 0);
                 } else {
-                  f.forEach(fr => fr.durationFactor = v);
+                  f.forEach(fr => fr.duration = v);
                 }
               }}
               label="Duration"

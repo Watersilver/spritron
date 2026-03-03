@@ -204,17 +204,6 @@ function TextureLoader({
 
   const loadingImages = imLength !== files.length;
 
-  useEffect(() => {
-    const a = (e: KeyboardEvent) => {
-      if (e.key === 'a') {
-        console.log(loadingImages, files.length, imLength, deproxify(store.images));
-      }
-    };
-    document.addEventListener('keydown', a);
-
-    return () => document.removeEventListener('keydown', a);
-  }, [loadingImages, files, imLength]);
-
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
