@@ -77,6 +77,7 @@ function MenuBar({
         <Typography>
           Then <Tooltip title="Click for export docs and examples"><Link
             href="#intro"
+            draggable="false"
           >export</Link></Tooltip>. That's all!
         </Typography>
         <br />

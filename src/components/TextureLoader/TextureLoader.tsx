@@ -184,10 +184,12 @@ function TextureLoader({
   }, [files]);
 
   const [hoveringImage, setHoveringImage] = useState(false);
-  // const [_, setHoveringImage] = useState(false);
 
   const storeImages = (files: File[]) => {
-    if (files.length == 0) return;
+    if (files.length == 0) {
+      setHoveringImage(false);
+      return;
+    }
     const merged: File[] = [];
 
     for (const f of [...store.files, ...files].reverse()) {
@@ -222,18 +224,26 @@ function TextureLoader({
       }
     };
     const onDrop = (e: DragEvent) => {
-      if (!e.dataTransfer) return;
-      if (loadingImages) return;
-      const files = [...e.dataTransfer.items]
-        .flatMap(i => {
-          const f = i.getAsFile()
-          if (!f) return [];
-          return [f];
-        });
-      storeImages(files);
-      e.preventDefault();
+      try {
+        if (!e.dataTransfer) return;
+        if (loadingImages) return;
+        const files = [...e.dataTransfer.items]
+          .flatMap(i => {
+            const f = i.getAsFile()
+            if (!f) return [];
+            return [f];
+          });
+        storeImages(files);
+        e.preventDefault();
+      } finally {
+        setHoveringImage(false);
+      }
     };
-    const onDragEnter = () => setHoveringImage(true);
+    const onDragEnter = () => {
+      if (!location.hash && hoveringImage === false) {
+        setHoveringImage(true);
+      }
+    };
 
     // Disable as it triggers for leaving every element, not just the window
     // Handle this case at the full screen drop prompt Box

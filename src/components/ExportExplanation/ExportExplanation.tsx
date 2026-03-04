@@ -1,10 +1,16 @@
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import { Alert, Box, Card, CardContent, Container, Dialog, IconButton, Link, Slide, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, type SxProps, type Theme } from "@mui/material";
+import { Alert, Box, Button, ButtonGroup, Card, CardContent, Container, Dialog, IconButton, Link, Slide, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, type SxProps, type Theme } from "@mui/material";
 import type { TransitionProps } from "@mui/material/transitions";
 import { forwardRef } from "react";
 import TagIcon from '@mui/icons-material/Tag';
 
-import {Test} from './CodeSnippets/codeSnippets';
+import {
+  GodotJsonExportUsage,
+  GodotJsonExportCode,
+  GodotImgExportCode,
+  GodotImgExportUsage
+} from './CodeSnippets/codeSnippets';
+import useCachedState from '../../utils/useCachedState';
 
 const Transition =
 forwardRef(
@@ -131,6 +137,17 @@ function ExportExplanation({
   open: boolean;
   onClose: () => void;
 }) {
+  const [engine, setEngine] = useCachedState(
+    "Godot",
+    "selectedTutorialEngine",
+    s=>s,s=>s
+  )
+  const [viewMode, setViewMode] = useCachedState(
+    "Usage",
+    "tutorialViewMode",
+    s=>s,s=>s
+  )
+
   return <Dialog
     fullScreen
     open={open}
@@ -148,15 +165,6 @@ function ExportExplanation({
         gridTemplateColumns: "auto 1fr",
         gap: 1
       })}
-      onWheel={e => {
-        const cont = document.querySelector("#explanation");
-        if (cont) {
-          cont.scrollTo({
-            'behavior': 'instant',
-            'top': cont.scrollTop + e.deltaY
-          });
-        }
-      }}
     >
       <Stack
         sx={{
@@ -191,6 +199,31 @@ function ExportExplanation({
               </li>
               <li>
                 <Link
+                  href="#usage-examples"
+                >
+                  Usage examples
+                </Link>
+              </li>
+              <ul
+                style={{paddingLeft: 8}}
+              >
+                <li>
+                  <Link
+                    href="#usage-examples-im-exp"
+                  >
+                    Image export
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="#usage-examples-json-exp"
+                  >
+                    JSON export (advanced)
+                  </Link>
+                </li>
+              </ul>
+              <li>
+                <Link
                   href="#docs"
                 >
                   Docs
@@ -210,17 +243,10 @@ function ExportExplanation({
                   <Link
                     href="#docs-json-exp"
                   >
-                    JSON export
+                    JSON export (advanced)
                   </Link>
                 </li>
               </ul>
-              <li>
-                <Link
-                  href="#usage-examples"
-                >
-                  Usage examples
-                </Link>
-              </li>
             </ul>
           </CardContent>
         </Card>
@@ -269,18 +295,191 @@ function ExportExplanation({
             </ul>
             <br/>
             <SectionTitle
+              title='Usage examples'
+              variant='h4'
+              id='usage-examples'
+            />
+            <Typography>
+              This section has implementations of spritron animations for different engines. It includes usage examples and the source code. To use it just copy and paste the code and follow the instructions to set it up.
+            </Typography>
+            <br/>
+            <SectionTitle
+              title='Image export'
+              variant='h5'
+              id='usage-examples-im-exp'
+              subtitle
+            />
+            <Stack
+              justifyContent="space-between"
+              direction='row'
+              mb={1}
+            >
+              <ButtonGroup>
+                <Button
+                  variant={engine === "Godot" ? "contained" : "outlined"}
+                  disabled={engine === "Godot"}
+                  onClick={() => {
+                    setEngine("Godot");
+                  }}
+                >Godot</Button>
+                <Button
+                  variant={engine === "Pixi.js" ? "contained" : "outlined"}
+                  disabled={engine === "Pixi.js"}
+                  onClick={() => {
+                    setEngine("Pixi.js");
+                  }}
+                >Pixi.js</Button>
+              </ButtonGroup>
+              <ButtonGroup>
+                <Button
+                  variant={viewMode === "Usage" ? "contained" : "outlined"}
+                  disabled={viewMode === "Usage"}
+                  onClick={() => {
+                    setViewMode("Usage");
+                  }}
+                >Usage</Button>
+                <Button
+                  variant={viewMode === "Code" ? "contained" : "outlined"}
+                  disabled={viewMode === "Code"}
+                  onClick={() => {
+                    setViewMode("Code");
+                  }}
+                >Code</Button>
+              </ButtonGroup>
+            </Stack>
+            {
+              engine === "Godot"
+              ? <>
+                <Typography mb={1}>
+                  This implementation works by loading the exported image and data to a Sprite2D node with a custom script.
+                </Typography>
+                <br/>
+                {
+                viewMode === "Code"
+                ? <GodotImgExportCode />
+                : viewMode === "Usage"
+                ? <GodotImgExportUsage />
+                : null
+                }
+              </>
+              : engine === "Pixi.js"
+              ? (
+                viewMode === "Code"
+                ? <>TODO</>
+                : viewMode === "Usage"
+                ? <>TODO</>
+                : null
+              )
+              : null
+            }
+            <br/>
+            <SectionTitle
+              title='JSON export'
+              variant='h5'
+              id='usage-examples-json-exp'
+              subtitle
+            />
+            <Stack
+              justifyContent="space-between"
+              direction='row'
+              mb={1}
+            >
+              <ButtonGroup>
+                <Button
+                  variant={engine === "Godot" ? "contained" : "outlined"}
+                  disabled={engine === "Godot"}
+                  onClick={() => {
+                    setEngine("Godot");
+                  }}
+                >Godot</Button>
+                <Button
+                  variant={engine === "Pixi.js" ? "contained" : "outlined"}
+                  disabled={engine === "Pixi.js"}
+                  onClick={() => {
+                    setEngine("Pixi.js");
+                  }}
+                >Pixi.js</Button>
+              </ButtonGroup>
+              <ButtonGroup>
+                <Button
+                  variant={viewMode === "Usage" ? "contained" : "outlined"}
+                  disabled={viewMode === "Usage"}
+                  onClick={() => {
+                    setViewMode("Usage");
+                  }}
+                >Usage</Button>
+                <Button
+                  variant={viewMode === "Code" ? "contained" : "outlined"}
+                  disabled={viewMode === "Code"}
+                  onClick={() => {
+                    setViewMode("Code");
+                  }}
+                >Code</Button>
+              </ButtonGroup>
+            </Stack>
+            {
+              engine === "Godot"
+              ? <>
+                <Typography mb={1}>
+                  This implementation works by loading the export in a Godot resource, `SpritronExport`, which is then passed to the node `SpritronAnimations`.
+                </Typography>
+                <Typography mb={1}>
+                  `SpritronAnimations` can then be used to play all the animations defined in the export.
+                </Typography>
+                <Alert severity='warning'>
+                  Different instances of `SpritronAnimations` should use the same `SpritronExport` resource if you want them to play the same animations. Do not create a different `SpritronExport` for each one or you might end up using duplicated textures.
+                </Alert>
+                <br/>
+                {
+                viewMode === "Code"
+                ? <GodotJsonExportCode />
+                : viewMode === "Usage"
+                ? <GodotJsonExportUsage />
+                : null
+                }
+              </>
+              : engine === "Pixi.js"
+              ? (
+                viewMode === "Code"
+                ? <>TODO</>
+                : viewMode === "Usage"
+                ? <>TODO</>
+                : null
+              )
+              : null
+            }
+            <br/>
+            <SectionTitle
               title='Docs'
               variant='h4'
               id='docs'
             />
+            <Typography>
+              This section describes the structure of the exports in case the code provided above doesn't cover your usecase or you want to make your own implementation.
+            </Typography>
+            <br/>
             <SectionTitle
               title='Image export'
               variant='h5'
               id='docs-im-exp'
               subtitle
             />
+            <Typography mb={1}>
+              The image export is a zip containing two files. An image of the selected format, and a json with animation data on it.
+            </Typography>
             <Typography>
-              The image export's optional data has information about the animation on the exported image:
+              The image is the same as the frames preview when creating the animation, with the same padding, offset and columns defined there.
+            </Typography>
+            <Typography mb={1}>
+              For the jpeg format, transparency is replaced by the first provided transparency colour.
+            </Typography>
+            <Typography mb={1}>
+              The export also has an optional json file to describe data about the animation.
+              You don't need to use this if the data is irrelevnt,
+              i.e. you intend to use the exported image just as a spritesheet.
+            </Typography>
+            <Typography>
+              Structure:
             </Typography>
             <br/>
             <TableContainer
@@ -439,7 +638,7 @@ function ExportExplanation({
                       Int
                     </TypeCell>
                     <DescCell>
-                      Number of frames of the animation. <br/><br/> Should be the same as the length of the duration array.
+                      Number of frames of the animation. <br/><br/> Should be the same as the length of the durations array.
                     </DescCell>
                   </TableRow>
                 </TableBody>
@@ -448,13 +647,27 @@ function ExportExplanation({
             <br/>
             <br/>
             <SectionTitle
-              title='JSON export'
+              title='JSON export (advanced)'
               variant='h5'
               id='docs-json-exp'
               subtitle
             />
+            <Typography mb={1}>
+              The json export consists of a single json file, intended to be used in conjunction with the images used in the animations.
+            </Typography>
+            <Typography mb={1}>
+              The provided json describes how to construct all the animations with the original spritesheets.
+            </Typography>
+            <Alert severity='warning' sx={{mb: 1}}>
+              The json is quite big.
+              Only use this approach if have a reason to use the original spritesheet instead of the exported image of the image export.
+              <br/>
+              For example, if the animations have to be used in the browser and you don't want to make two HTTP requests per animation (one for the image and another for its data).
+              <br/>
+              Another example is if you want to limit vram usage, it could potentially help, provided there is no part of the spritesheet that goes unused, it could save space because the image export might have repeat frames and any frame offset is baked into the texture.
+            </Alert>
             <Typography>
-              The json export has animation data that can be used to recreate the spritron animation at runtime:
+              Structure:
             </Typography>
             <br/>
             <TableContainer
@@ -1225,14 +1438,6 @@ function ExportExplanation({
                 </TableBody>
               </Table>
             </TableContainer>
-            <br/>
-            <br/>
-            <SectionTitle
-              title='Usage examples'
-              variant='h4'
-              id='usage-examples'
-            />
-            <Test />
           </CardContent>
         </Card>
       </Container>

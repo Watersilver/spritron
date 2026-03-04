@@ -182,7 +182,7 @@ const store = proxify<Store>({
   extractImage: null,
   extractImageFormat: "png",
   extractImageTrim: false,
-  extractImageAnimData: true
+  extractImageAnimData: true,
   // selectedAnimationObj: null
 });
 // Initialize colours
