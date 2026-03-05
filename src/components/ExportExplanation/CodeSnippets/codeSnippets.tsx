@@ -11,7 +11,7 @@ function CodeDisplay({
   code
 }: {
   codeHtml: string,
-  code: string
+  code?: string
 }) {
   const [error, setError] = useState("");
 
@@ -31,7 +31,8 @@ function CodeDisplay({
 
   return <Box
     sx={{
-      position: "relative"
+      position: "relative",
+			tabSize: 2
     }}
   >
     <Box
@@ -44,7 +45,8 @@ function CodeDisplay({
       }}
       dangerouslySetInnerHTML={{__html: codeHtml}}
     />
-    <Tooltip
+    {code
+		? <Tooltip
       title={error || "Copied!"}
       disableHoverListener
       open={copyDone}
@@ -86,9 +88,13 @@ function CodeDisplay({
         }
       </IconButton>
     </Tooltip>
+		: null}
   </Box>;
 }
 
+///////////////
+//// Godot ////
+///////////////
 
 const godotUsageJsonExpCode =
 `## Exported properties will be marked with (EXP) and can (and in
@@ -154,7 +160,6 @@ export function GodotJsonExportUsage() {
   return <>
   <CodeDisplay
     codeHtml={innerHtml}
-    code={godotUsageJsonExpCode}
   />
   </>;
 }
@@ -602,6 +607,11 @@ export function GodotJsonExportCode() {
     onChange={(_, v) => {
       setGodotTab(v);
     }}
+		sx={{
+			"& button": {
+				textTransform: "none"
+			}
+		}}
   >
     <Tab
       label="spritron_animations.gd"
@@ -668,7 +678,6 @@ export function GodotImgExportUsage() {
   return <>
   <CodeDisplay
     codeHtml={innerHtml}
-    code={godotUsageImgExpCode}
   />
   </>;
 }
@@ -826,5 +835,1239 @@ export function GodotImgExportCode() {
     codeHtml={innerHtml}
     code={godotImgExpCode}
   />
+  </>;
+}
+
+
+/////////////////
+//// Pixi.js ////
+/////////////////
+
+
+const pixiUsageJsonExpCode =
+`// Import the json export
+import animations from "./path/to/animations";
+
+// Import Pixi.js textures
+import spritesheetTexture from "./path/to/spritesheetTexture";
+
+// Class that maps data to textures
+import SpritronFullExport from "./path/to/SpritronFullExport";
+
+// Function that takes a texture and a list of transparencies
+// and returnes a texture with transparencies applied
+// optionally deleting the original texture
+import applyTransparencies from "./path/to/applyTransparencies";
+
+// Pixi.js renderer, needed to apply transparencies
+import renderer from "./path/to/renderer/";
+
+// This is a generic class, which means that you can make animations
+// a const and enforce much stricter type checks and autocomplete
+const e = new SpritronFullExport(
+	animations,
+	{
+		// If there are no transparencies to apply just pass the texture
+		"spritesheet.png": applyTransparencies(
+			spritesheetTexture,
+			animations.transparenciesMap["spritesheet.png"],
+			renderer
+		)
+	}
+)
+
+// Class that extends pixi.js container and is meant
+// to play animations provided by a spritron export
+import SpritronAnimations from "./path/to/SpritronAnimations";
+
+// Create your animations and add them to your stage
+const anims = new SpritronAnimations(e);
+import stage from "./path/to/stage";
+stage.addChild(anims);
+
+// Change selected animation (If animation doesn't exist it has no effect)
+// \`SpritronAnimations\` is generic, so if your animation export is const
+// you get strict type check and autocomplete here!
+anims.currentAnimationName = "animation_1";
+
+// Change animation speed (negative for reverse)
+anims.animationSpeed = 0.5;
+
+// Change animation frame (decimal part is animation progress)
+anims.frame = 1.5;
+
+// Play or stop animation
+anims.playing = true;
+
+// Call this repeatedly wherever you have your ticker
+// (or whatever other method you use to update your scene)
+// and pass it its delta time in seconds to progress the animation
+anims.update(0.1);
+`
+let pixiUsageJsonExpCodeHtml = "";
+const pixiUsageJsonExpCodeHtmlPromise = codeToHtml(pixiUsageJsonExpCode, {
+  lang: 'ts',
+  theme: 'vitesse-dark'
+}).then((result) => {
+  pixiUsageJsonExpCodeHtml = result;
+});
+export function PixiJsonExportUsage() {
+  const [innerHtml, setInnerHtml] = useState(pixiUsageJsonExpCodeHtml);
+  useEffect(() => {
+    if (pixiUsageJsonExpCodeHtml === "") {
+      pixiUsageJsonExpCodeHtmlPromise.then(() => setInnerHtml(pixiUsageJsonExpCodeHtml))
+    }
+  }, []);
+  return <>
+  <CodeDisplay
+    codeHtml={innerHtml}
+  />
+  </>;
+}
+
+
+const pixiSprAnimJsonExpCode =
+`import {
+	ColorSource,
+	Container,
+	ContainerChild,
+	ContainerOptions,
+	Graphics,
+	Rectangle,
+	Sprite,
+	Texture
+} from "pixi.js";
+import { ReadonlySpritronJsonExport } from "./SpritronJsonExport";
+import SpritronFullExport from "./SpritronFullExport";
+
+
+class SpritronAnimations<J extends ReadonlySpritronJsonExport> extends Container {
+  private sprExp: SpritronFullExport<J>;
+  /** Underlying sprite. Avoid directly modifying it. */
+  sprite: Sprite;
+  /** Multiplies base fps. Negative values reverse animation. */
+  animationSpeed = 1;
+  private _framesLength = 1;
+  /** Length of the current animation frames, taking ping pong into account. */
+  get framesLength() {
+    return this._framesLength;
+  }
+  private _playing = true;
+  /** Controls if animation is playing or paused */
+  get playing() {
+    return this._playing;
+  }
+  set playing(p) {
+    this._playing = p
+
+    if (p) {
+      // Restart non looping animation on its last frame
+      if (!this._curAnim.loop) {
+        if (this.animationSpeed > 0) {
+          if (this.frame + 1 >= this._framesLength) {
+            this.frame = 0;
+          }
+        } else if (this.animationSpeed < 0) {
+          if (this.frame < 1) {
+            this.frame = this._framesLength - 0.0001; // This is a hack. I am a hacker
+          }
+        }
+      }
+    }
+  }
+
+  /** Colour of the debug rectangle */
+  debugCol: ColorSource = "green";
+  /** True if debug is toggled on */
+  get isDebugEnabled() {return !!this.debug;}
+  private debug: Graphics | null = null;
+  private updateDebug(d: Graphics) {
+    let globalScaleX = this.scale.x;
+    let globalScaleY = this.scale.y;
+    let p = this.parent;
+    while (p) {
+      globalScaleX *= p.scale.x;
+      globalScaleY *= p.scale.y;
+      p = p.parent;
+    }
+    let strokeWidth = 2 / (Math.max(globalScaleX, globalScaleY));
+    let w = this.width / this.scale.x;
+    let h = this.height / this.scale.y;
+    if (Number.isNaN(strokeWidth) || !Number.isFinite(strokeWidth)) {
+      strokeWidth = 0;
+    }
+    if (Number.isNaN(w) || !Number.isFinite(w)) {
+      w = 0;
+    }
+    if (Number.isNaN(h) || !Number.isFinite(h)) {
+      h = 0;
+    }
+    d.clear();
+    d.rect(-w * 0.5, -h * 0.5, w, h);
+    d.moveTo(1,0);
+    d.lineTo(-1,0);
+    d.moveTo(0,1);
+    d.lineTo(0,-1);
+    d.stroke({color: this.debugCol, width: strokeWidth});
+  }
+  /** If enabled will draw a rectangle around the frame for debugging purposes */
+  toggleDebug(enable: boolean) {
+    if (enable) {
+      if (!this.debug) {
+        this.debug = new Graphics();
+        this.addChild(this.debug);
+        this.updateDebug(this.debug);
+      }
+    } else {
+      if (this.debug) {
+        this.debug.removeFromParent();
+        this.debug.destroy();
+        this.debug = null;
+      }
+    }
+  }
+
+  private _curAnim: J['animations'][number];
+  /** Get data of current animation */
+  get currentAnimation() {
+    return this._curAnim;
+  }
+
+  /**
+   * @param frame integer
+   */
+  private updateVisuals(frame: number) {
+    let fd: J['animations'][number]['frames'][number] | undefined;
+    if (this._curAnim.pingPong && frame >= this._curAnim.frames.length) {
+      const f = frame - this._curAnim.frames.length;
+
+      const frames = [...this._curAnim.frames];
+
+      if (this._curAnim.pingPong.noLast) {
+        frames.pop();
+      }
+      
+      frames.reverse();
+
+      if (this._curAnim.pingPong.noFirst) {
+        frames.pop();
+      }
+
+      fd = frames[f];
+    } else {
+      fd = this._curAnim.frames[frame];
+    }
+
+    if (!fd) return;
+
+    this._curFrData = fd;
+
+    const animName = this._curAnim.name;
+
+    if (animName === undefined) {
+      console.error("Animation name not found");
+      return;
+    }
+
+    const ts = this.sprExp.textures[animName];
+
+    if (!ts) {
+      console.error("Texture list not found for aniamtion: \"" + animName + "\"");
+      return;
+    }
+
+    let newTexture: Texture | undefined;
+
+    if (this._curAnim.pingPong && frame >= this._curAnim.frames.length) {
+      const f = frame - this._curAnim.frames.length;
+
+      const textures = [...ts];
+
+      if (this._curAnim.pingPong.noLast) {
+        textures.pop();
+      }
+      
+      textures.reverse();
+
+      if (this._curAnim.pingPong.noFirst) {
+        textures.pop();
+      }
+
+      newTexture = textures[f];
+    } else {
+      newTexture = ts[frame];
+    }
+
+    if (!newTexture) {
+      console.error("Texture not found for frame: \"" + frame + "\" of animation: \"" + this._curAnim.name + "\"");
+      return;
+    }
+
+    this.sprite.texture = newTexture;
+
+    // Pivot placed in the middle of sprite but not midpixel to mimic spritron's preview
+    this.sprite.pivot.x = Math.floor(this.sprite.width * 0.5);
+    this.sprite.pivot.y = Math.floor(this.sprite.height * 0.5);
+
+    // Set angle based on global animation angle and local frame angle
+    const angle = (fd.t?.r ?? 0) + (this._curAnim.transform?.rotation ?? 0);
+    // True modulo operation as explained here:
+		// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Remainder
+    this.sprite.angle = ((angle % 360) + 360) % 360;
+
+    // Set mirror and flip based on global animation and local frame values
+    this.sprite.scale.x = (!!fd.t?.m?.x !== !!this._curAnim.transform?.mirror?.x) ? -1 : 1;
+    this.sprite.scale.y = (!!fd.t?.m?.y !== !!this._curAnim.transform?.mirror?.y) ? -1 : 1;
+
+    // Determine width and height depending of if sprite is angled sideways
+    let w = 0;
+    let h = 0;
+    if (angle % 180 === 0) {
+      w = this.sprite.width;
+      h = this.sprite.height;
+    } else {
+      w = this.sprite.height;
+      h = this.sprite.width;
+    }
+
+    // Set sprite position depending on frame dimensions and offset
+    this.sprite.x = fd.o.x + w * 0.5 - this._curAnim.frameDimensions.w * 0.5;
+    this.sprite.y = fd.o.y + h * 0.5 - this._curAnim.frameDimensions.h * 0.5;
+
+
+    if (this.debug) {
+      this.updateDebug(this.debug);
+    }
+  }
+
+  /** Name of currently selected animation.
+	 * Set to change animation (Set will silently fail if new animation doesn't exist). */
+  get currentAnimationName() {
+    return this._curAnim.name;
+  }
+  set currentAnimationName(name: J['animations'][number]['name']) {
+    const ca = this.sprExp.data.animations.find(a => a.name === name);
+    if (!ca) return;
+    this._curAnim = ca;
+    // Update frames length
+    this._framesLength = ca.framesLength;
+    this.updateVisuals(Math.floor(this.frame));
+  }
+
+  private _curFrData: J['animations'][number]['frames'][number];
+  /** Get data of current frame */
+  get currentFrameData() {
+    return this._curFrData;
+  }
+
+  private _frame = 0;
+  /** Decimal value representing current frame. Both setter and getter clamped between 0 and
+	 * framesLength, but getter doesn't change the underlying value.
+	 * 
+	 * For example if frame is 4 and framesLength changes to 2 then the getter will return 0.
+	 * But if we change framesLength again to 5 without setting it the getter will return 4 again.
+	 * It's not set to 0 when it gets clamped in the getter. */
+  get frame() {
+    const fl = this._framesLength;
+    // True modulo operation as explained here:
+		// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Remainder
+    return ((this._frame % fl) + fl) % fl;
+  }
+  set frame(f: number) {
+    const prevF = Math.floor(this._frame);
+
+    const fl = this._framesLength;
+    // True modulo operation as explained here:
+		// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Remainder
+    this._frame = ((f % fl) + fl) % fl;
+    const currF = Math.floor(this._frame);
+    if (prevF !== currF) {
+      this.updateVisuals(currF);
+    }
+  }
+
+  /**
+   * Scaled width of the frame. Changing it changes the scale.
+   */
+  get frameWidth() {
+    return this._curAnim.frameDimensions.w * this.scale.x;
+  }
+  set frameWidth(w: number) {
+    const newScale = w / this._curAnim.frameDimensions.w;
+    if (!Number.isFinite(newScale) || Number.isNaN(newScale)) return;
+    this.scale.x = w / this._curAnim.frameDimensions.w;
+  }
+  /**
+   * Scaled height of the frame. Changing it changes the scale.
+   */
+  get frameHeight() {
+    return this._curAnim.frameDimensions.h * this.scale.y;
+  }
+  set frameHeight(h: number) {
+    const newScale = h / this._curAnim.frameDimensions.h;
+    if (!Number.isFinite(newScale) || Number.isNaN(newScale)) return;
+    this.scale.y = h / this._curAnim.frameDimensions.h;
+  }
+
+  constructor(
+    spritronFullExport: SpritronFullExport<J>,
+    options?: ContainerOptions<ContainerChild>
+  ) {
+    super(options);
+    this.sprExp = spritronFullExport;
+
+    this.sprite = Sprite.from(new Texture({frame: new Rectangle()}));
+
+    this.addChild(this.sprite);
+
+    // At least one animation and one frame should always exist! Validate your input!
+    // Even from yourself. Especially from yourself! Your past self is your ENEMY!
+    this._curAnim = spritronFullExport.data.animations[0]!;
+    this._curFrData = this.currentAnimation.frames[0]!;
+
+    // Initialize animation through the currentAnimationName setter
+    this.currentAnimationName = this._curAnim.name;
+  }
+
+  /**
+   * Updates the animation. Call repeatedly in your ticker/whatever you use for updates.
+   * 
+   * @param dt in seconds! 
+   */
+  update(dt: number) {
+    if (this._playing) {
+      const prevFrame = this.frame;
+      // Avoid 0/0
+      const dividend = dt * this._curAnim.fps * this.animationSpeed;
+      if (dividend !== 0) {
+        // Avoid potential Infinity
+        this.frame += Math.min(dividend / this._curFrData.d, 1);
+      }
+
+      if (!this._curAnim.loop) {
+        if (this.animationSpeed > 0) {
+          if (prevFrame > this.frame) {
+            this.frame = prevFrame;
+            this._playing = false;
+          }
+        } else {
+          if (prevFrame < this.frame) {
+            this.frame = prevFrame;
+            this._playing = false;
+          }
+        }
+      }
+    }
+  }
+}
+
+export default SpritronAnimations
+`
+let pixiSprAnimJsonExpCodeHtml = "";
+const pixiSprAnimJsonExpCodeHtmlPromise = codeToHtml(pixiSprAnimJsonExpCode, {
+  lang: 'ts',
+  theme: 'vitesse-dark'
+}).then((result) => {
+  pixiSprAnimJsonExpCodeHtml = result;
+});
+const pixiFullExpJsonExpCode =
+`import { Rectangle, Texture, TextureSource } from "pixi.js";
+import { ReadonlySpritronJsonExport } from "./SpritronJsonExport";
+
+class SpritronFullExport<J extends ReadonlySpritronJsonExport> {
+  readonly data: J;
+  readonly textures: {
+    readonly [animationName: string]: Texture[]
+  };
+
+  constructor(input: J, textureMap: {readonly [imageName in J['images'][number]]: TextureSource}) {
+    this.data = input;
+
+    const textures: {
+      [animationName: string]: Texture[]
+    } = {};
+
+    for (const a of input.animations) {
+      const animTexts: Texture[] = [];
+      textures[a.name] = animTexts;
+
+      for (const f of a.frames) {
+        const imageName: J['images'][number] | undefined = f.i !== undefined ? input.images[f.i] : undefined;
+        const source: TextureSource | undefined = imageName !== undefined ? textureMap[imageName] : undefined;
+
+        if (source) {
+          animTexts.push(new Texture({
+            frame: new Rectangle(f.b.x, f.b.y, f.b.w, f.b.h),
+            source
+          }));
+        }
+      }
+    }
+
+    this.textures = textures;
+  }
+};
+
+export default SpritronFullExport`
+let pixiFullExpJsonExpCodeHtml = "";
+const pixiFullExpJsonExpCodeHtmlPromise = codeToHtml(pixiFullExpJsonExpCode, {
+  lang: 'ts',
+  theme: 'vitesse-dark'
+}).then((result) => {
+  pixiFullExpJsonExpCodeHtml = result;
+});
+const pixiApplTransJsonExpCode =
+`import { Filter, Renderer, RenderTexture, Sprite, TextureSource } from "pixi.js";
+
+function applyTransparencies(
+  tex: TextureSource,
+  transparencies: readonly {
+    readonly colour: { readonly r: number; readonly g: number; readonly b: number; };
+    readonly threshold: number;
+  }[],
+  renderer: Renderer,
+  destroyInputTexture = true
+) {
+  const original = Sprite.from(tex);
+  const target = RenderTexture.create({width: original.width, height: original.height});
+
+  if (transparencies.length !== 0) {
+
+    const vertex = \`
+      in vec2 aPosition;
+      out vec2 vTextureCoord;
+
+      uniform vec4 uInputSize;
+      uniform vec4 uOutputFrame;
+      uniform vec4 uOutputTexture;
+
+      vec4 filterVertexPosition( void )
+      {
+          vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
+          
+          position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+          position.y = position.y * (2.0*uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+
+          return vec4(position, 0.0, 1.0);
+      }
+
+      vec2 filterTextureCoord( void )
+      {
+          return aPosition * (uOutputFrame.zw * uInputSize.zw);
+      }
+
+      void main(void)
+      {
+          gl_Position = filterVertexPosition();
+          vTextureCoord = filterTextureCoord();
+      }
+    \`;
+
+    const fragment = \`
+      in vec2 vTextureCoord;
+
+      uniform sampler2D uTexture;
+
+      void main(void)
+      {
+        vec4 c = texture2D(uTexture, vTextureCoord);
+
+        if (
+          \${transparencies.map(t => \`
+            (c.r >= \${(t.colour.r - t.threshold).toFixed(1)}
+            && c.r <= \${(t.colour.r + t.threshold).toFixed(1)}
+            && c.g >= \${(t.colour.g - t.threshold).toFixed(1)}
+            && c.g <= \${(t.colour.g + t.threshold).toFixed(1)}
+            && c.b >= \${(t.colour.b - t.threshold).toFixed(1)}
+            && c.b <= \${(t.colour.b + t.threshold).toFixed(1)})
+          \`).join("||")}
+        ) {
+          gl_FragColor = vec4(0.0,0.0,0.0,0.0);
+        } else {
+          gl_FragColor = c;
+        }
+      }
+    \`;
+
+    original.filters = [...(original.filters || []), Filter.from({
+      gl: {fragment, vertex},
+      gpu: {fragment: {source: fragment}, vertex: {source: vertex}}
+    })];
+
+    renderer.render({container: original, target});
+    original.destroy();
+  }
+
+  const newSource = target.source;
+  target.destroy();
+  if (destroyInputTexture) {
+    tex.destroy();
+  }
+  return newSource;
+}
+
+export default applyTransparencies;
+`
+let pixiApplTransJsonExpCodeHtml = "";
+const pixiApplTransJsonExpCodeHtmlPromise = codeToHtml(pixiApplTransJsonExpCode, {
+  lang: 'ts',
+  theme: 'vitesse-dark'
+}).then((result) => {
+  pixiApplTransJsonExpCodeHtml = result;
+});
+const pixiTypeJsonExpCode =
+`export type ReadonlySpritronJsonExport = {
+  /**
+   * Contains the names of the involved images.
+   * Used as IDs of the images.
+   */
+  readonly images: readonly string[];
+  /**
+   * Lists of colour ranges that should be
+   * treated as transparent on their corresponding images.
+   */
+  readonly transparenciesMap: {
+    readonly [imageName: string]: readonly {
+      /**
+       * Values between [0, 1]
+       */
+      readonly colour: {
+        /** Values between [0, 1] */
+        readonly r: number;
+        /** Values between [0, 1] */
+        readonly g: number;
+        /** Values between [0, 1] */
+        readonly b: number;
+      };
+      /**
+       * Should be added and subtracted to each of the RGB colour
+       * values to determine the range.
+       * Any colour with RGB values in between is within the range.
+       */
+      readonly threshold: number;
+    }[];
+  };
+  /**
+   * Array of all animations data
+   */
+  readonly animations: readonly {
+    /**
+     * Unique animation identifier
+     */
+    readonly name: string;
+    /**
+     * Frames per second
+     */
+    readonly fps: number;
+    /**
+     * Whether animation should loop
+     */
+    readonly loop: boolean;
+    /**
+     * If not null, animation should not end when reaching last frame.
+     * Instead is should play again in reverse.
+     */
+    readonly pingPong: null | {
+      /**
+       * If true, when playing the animation in reverse due to ping pong,
+       * the first frame (of the normal direction of the animation) should be skipped.
+       */
+      readonly noFirst: boolean;
+      /**
+       * If true, when playing the animation in reverse due to ping pong,
+       * the last frame (of the normal direction of the animation) should be skipped.
+       */
+      readonly noLast: boolean;
+    };
+    /**
+     * How the sprite should be rotated and/or mirrored.
+     */
+    readonly transform: null | {
+      /**
+       * In degrees. Pivot should be at center of the current frame's sprite.
+       */
+      readonly rotation: null | 90 | 180 | 270;
+      /**
+       * The x component mirrors around a vertical line
+       * that passes through the center of the sprite and the y around a horizontal.
+       */
+      readonly mirror: null | {
+        /** Mirrors around a vertical line */
+        readonly x: boolean;
+        /** Mirrors around a horizontal line */
+        readonly y: boolean;
+      };
+    };
+    /**
+     * Dimensions of every frame of the animation.
+     */
+    readonly frameDimensions: {
+      /** Width in pixels */
+      readonly w: number;
+      /** Height in pixels */
+      readonly h: number;
+    };
+    /**
+     * An array of the animation frames data in order.
+     */
+    readonly frames: readonly {
+      /** Image index referencing the \`images\` array.
+       * The corresponding image is the one that should be used for this frame. */
+      readonly i: number;
+      /**
+       * Frame duration. It determines how long a
+       * frame should last compared to a 'normal' frame (duration: 1).
+       * 
+       * A frame with a duration of 2 should last
+       * twice as long and a frame with a duration of 0.5 should last half as long.
+       * 
+       * This can be achieved by dividing the animation's
+       * frames per second by this value before using it to
+       * calculate the current frame progress.
+       * 
+       * **Be careful when dividing by 0 or when
+       * both dividend and divisor are 0.**
+       */
+      readonly d: number;
+      /**
+       * Transform. How the sprite should be rotated and/or mirrored.
+       * 
+       * Should be combined with animation transform.
+       */
+      readonly t: null | {
+        /** Frame rotation in degrees.
+         * Should be added to animation rotation.
+         * Pivot should be at center of the current frame's sprite.
+         */
+        readonly r: null | 90 | 180 | 270;
+        /**
+         * Frame mirror. Should be combined with animation mirror.
+         * 
+         * The x component mirrors around a vertical line that
+         * passes through the center of the sprite and the y around a horizontal.
+         */
+        readonly m: null | {
+          /** Mirrors around a vertical line */
+          readonly x: boolean;
+          /** Mirrors around a horizontal line */
+          readonly y: boolean;
+        };
+      };
+      /**
+       * Bounds. A rectangle that defines the part of the
+       * image that should be visible for this
+       * frame's texture.
+       * 
+       * Units are pixels.
+       */
+      readonly b: {
+        /** In pixels */
+        x: number;
+        /** In pixels */
+        y: number;
+        /** Width in pixels */
+        w: number;
+        /** Height in pixels */
+        h: number;
+      };
+      /**
+       * Offset in pixels.
+       * 
+       * The way sprite placement works is as such:
+       * - Use the frame bounds to create a sprite from the image.
+       * - Place the transform pivot at the center of the created sprite.
+       * (Floor if you want to make it exactly the same as spritron.)
+       * - Apply rotations and mirrors.
+       * - Use the animation frameDimensions to align the sprite's
+       * post rotation top-left to the top left of the frame's dimensions rectangle.
+       * - Apply the offset by adding it to the sprite position.
+       */
+      readonly o: {
+        /** In pixels */
+        readonly x: number;
+        /** In pixels */
+        readonly y: number;
+      };
+    }[];
+    /**
+     * The amount of frames of the animations, adjusted for ping pong.
+     */
+    readonly framesLength: number;
+  }[];
+}`
+let pixiTypeJsonExpCodeHtml = "";
+const pixiTypeJsonExpCodeHtmlPromise = codeToHtml(pixiTypeJsonExpCode, {
+  lang: 'ts',
+  theme: 'vitesse-dark'
+}).then((result) => {
+  pixiTypeJsonExpCodeHtml = result;
+});
+export function PixiJsonExportCode() {
+	const [sprAnimHtml, setSprAnimHtml] = useState(pixiSprAnimJsonExpCodeHtml);
+  useEffect(() => {
+    if (pixiSprAnimJsonExpCodeHtml === "") {
+      pixiSprAnimJsonExpCodeHtmlPromise.then(() => setSprAnimHtml(pixiSprAnimJsonExpCodeHtml))
+    }
+  }, []);
+	const [fullExpHtml, setFullExpHtml] = useState(pixiFullExpJsonExpCodeHtml);
+  useEffect(() => {
+    if (pixiFullExpJsonExpCodeHtml === "") {
+      pixiFullExpJsonExpCodeHtmlPromise.then(() => setFullExpHtml(pixiFullExpJsonExpCodeHtml))
+    }
+  }, []);
+	const [applTransHtml, setApplTransHtml] = useState(pixiApplTransJsonExpCodeHtml);
+  useEffect(() => {
+    if (pixiApplTransJsonExpCodeHtml === "") {
+      pixiApplTransJsonExpCodeHtmlPromise.then(() => setApplTransHtml(pixiApplTransJsonExpCodeHtml))
+    }
+  }, []);
+	const [typeHtml, setTypeHtml] = useState(pixiTypeJsonExpCodeHtml);
+  useEffect(() => {
+    if (pixiTypeJsonExpCodeHtml === "") {
+      pixiTypeJsonExpCodeHtmlPromise.then(() => setTypeHtml(pixiTypeJsonExpCodeHtml))
+    }
+  }, []);
+
+  const [pixiTab, setPixiTab] = useCachedState(
+    "SpritronAnimations.ts",
+    "tutorialPixiJsonExpTab",
+    s=>s,s=>s
+  );
+
+  return <>
+  <Tabs
+    value={pixiTab}
+    onChange={(_, v) => {
+      setPixiTab(v);
+    }}
+		sx={{
+			"& button": {
+				textTransform: "none"
+			}
+		}}
+  >
+    <Tab
+      label="SpritronAnimations.ts"
+      value={'SpritronAnimations.ts'}
+    />
+    <Tab
+      label="SpritronFullExport.ts"
+      value={'SpritronFullExport.ts'}
+    />
+    <Tab
+      label="applyTransparencies.ts"
+      value={'applyTransparencies.ts'}
+    />
+    <Tab
+      label="SpritronJsonExport.d.ts"
+      value={'SpritronJsonExport.d.ts'}
+    />
+  </Tabs>
+	{
+		pixiTab === "SpritronAnimations.ts"
+		? <CodeDisplay
+			codeHtml={sprAnimHtml}
+			code={pixiSprAnimJsonExpCode}
+		/>
+		: pixiTab === "SpritronFullExport.ts"
+		? <CodeDisplay
+			codeHtml={fullExpHtml}
+			code={pixiFullExpJsonExpCode}
+		/>
+		: pixiTab === "applyTransparencies.ts"
+		? <CodeDisplay
+			codeHtml={applTransHtml}
+			code={pixiApplTransJsonExpCode}
+		/>
+		: pixiTab === "SpritronJsonExport.d.ts"
+		? <CodeDisplay
+			codeHtml={typeHtml}
+			code={pixiTypeJsonExpCode}
+		/>
+		: null
+	}
+  </>;
+}
+
+
+const pixiUsageImgExpCode =
+`// Import the animation data json
+import animation from "./path/to/animation";
+
+// Import Pixi.js texture
+import spritesheetTexture from "./path/to/spritesheetTexture";
+
+// Class that maps data to texture
+import SpritronImageExport from "./path/to/SpritronImageExport";
+
+const e = new SpritronImageExport(
+	animation,
+	spritesheetTexture
+)
+
+// Class that extends pixi.js sprite and is meant
+// to play animation provided by a spritron image export
+import SpritronAnimation from "./path/to/SpritronAnimation";
+
+// Create your animation and add it to your stage
+const anim = new SpritronAnimation(e);
+import stage from "./path/to/stage";
+stage.addChild(anim);
+
+// Change animation speed (negative for reverse)
+anim.animationSpeed = 0.5;
+
+// Change animation frame (decimal part is animation progress)
+anim.frame = 1.5;
+
+// Play or stop animation
+anim.playing = true;
+
+// Call this repeatedly wherever you have your ticker
+// (or whatever other method you use to update your scene)
+// and pass it its delta time in seconds to progress the animation
+anim.update(0.1);
+`
+let pixiUsageImgExpCodeHtml = "";
+const pixiUsageImgExpCodeHtmlPromise = codeToHtml(pixiUsageImgExpCode, {
+  lang: 'ts',
+  theme: 'vitesse-dark'
+}).then((result) => {
+  pixiUsageImgExpCodeHtml = result;
+});
+export function PixiImgExportUsage() {
+  const [innerHtml, setInnerHtml] = useState(pixiUsageImgExpCodeHtml);
+  useEffect(() => {
+    if (pixiUsageImgExpCodeHtml === "") {
+      pixiUsageImgExpCodeHtmlPromise.then(() => setInnerHtml(pixiUsageImgExpCodeHtml))
+    }
+  }, []);
+  return <>
+  <CodeDisplay
+    codeHtml={innerHtml}
+  />
+  </>;
+}
+
+const pixiSprAnimImgExpCode =
+`import { Sprite, SpriteOptions, Texture } from "pixi.js";
+import SpritronImageExport from "./SpritronImageExport";
+
+class SpritronAnimation extends Sprite {
+  private _imageExport: SpritronImageExport;
+  get imageExport() {
+    return this._imageExport;
+  }
+  set imageExport(ie) {
+    this._imageExport = ie;
+
+    // Make sure frame is clamped properly
+    const fl = this._imageExport.frames.length;
+    // True modulo operation as explained here:
+		// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Remainder
+    this._frame = ((this._frame % fl) + fl) % fl;
+
+    this.rerender();
+  }
+
+  private _playing = true;
+  /** Controls if animation is playing or paused */
+  get playing() {
+    return this._playing;
+  }
+  set playing(p) {
+    this._playing = p
+
+    if (p) {
+      // Restart non looping animation on its last frame
+      if (!this._imageExport.json.loop) {
+        if (this.animationSpeed > 0) {
+          if (this.frame + 1 >= this._imageExport.frames.length) {
+            this.frame = 0;
+          }
+        } else if (this.animationSpeed < 0) {
+          if (this.frame < 1) {
+            this.frame = this._imageExport.frames.length - 0.0001; // Hackfraudery
+          }
+        }
+      }
+    }
+  }
+
+  private _frame = 0;
+  /**
+	 * Decimal value representing current frame.
+	 * Both setter and getter clamped between 0 and frames.length of the json export,
+	 * but getter doesn't change the underlying value. So for example if frame is 4
+	 * and frames.length changes to 2 then the getter will return 0.
+	 * But if we change frames.length again to 5 without setting it the getter
+	 * will return 4 again. It's not set to 0 when it gets clamped in the getter.
+	 */
+  get frame() {
+    const fl = this._imageExport.frames.length;
+    // True modulo operation as explained here:
+		// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Remainder
+    return ((this._frame % fl) + fl) % fl;
+  }
+  set frame(f: number) {
+    const prevF = Math.floor(this._frame);
+
+    const fl = this._imageExport.frames.length;
+    // True modulo operation as explained here:
+		// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Remainder
+    this._frame = ((f % fl) + fl) % fl;
+    const currF = Math.floor(this._frame);
+    if (prevF !== currF) {
+      this.rerender()
+    }
+  }
+
+  animationSpeed = 1;
+
+  rerender() {
+    const f = Math.floor(this.frame);
+    if (this.imageExport.frames[f]) {
+      this.texture = this.imageExport.frames[f];
+      this.pivot.x = Math.floor(this.width * 0.5);
+      this.pivot.y = Math.floor(this.height * 0.5);
+    }
+  }
+
+
+  constructor(
+    imageExport: SpritronImageExport,
+    options?: SpriteOptions | Texture
+  ) {
+    super(options)
+    this._imageExport = imageExport;
+
+    this.rerender();
+  }
+
+  /**
+   * Updates the animation. Call repeatedly in your ticker/whatever you use for updates.
+   * 
+   * @param dt in seconds! 
+   */
+  update(dt: number) {
+    if (this._playing) {
+      const prevFrame = this.frame;
+      // Avoid 0/0
+      const dividend = dt * this._imageExport.json.framesPerSecond * this.animationSpeed;
+      if (dividend !== 0) {
+        // Avoid potential Infinity
+        this.frame += Math.min(dividend / this._imageExport.json.durations[Math.floor(this.frame)]!, 1);
+      }
+
+      if (!this._imageExport.json.loop) {
+        if (this.animationSpeed > 0) {
+          if (prevFrame > this.frame) {
+            this.frame = prevFrame;
+            this._playing = false;
+          }
+        } else {
+          if (prevFrame < this.frame) {
+            this.frame = prevFrame;
+            this._playing = false;
+          }
+        }
+      }
+    }
+  }
+};
+
+export default SpritronAnimation
+`
+let pixiSprAnimImgExpCodeHtml = "";
+const pixiSprAnimImgExpCodeHtmlPromise = codeToHtml(pixiSprAnimImgExpCode, {
+  lang: 'ts',
+  theme: 'vitesse-dark'
+}).then((result) => {
+  pixiSprAnimImgExpCodeHtml = result;
+});
+const pixiExpImgExpCode =
+`import { Rectangle, Texture, TextureSource } from "pixi.js";
+import { ReadonlySpritronImageExportJson } from "./SpritronImageExportJson"
+
+class SpritronImageExport {
+  readonly json: ReadonlySpritronImageExportJson;
+  readonly frames: readonly Texture[];
+
+  constructor(
+    json: ReadonlySpritronImageExportJson,
+    textureSource: TextureSource
+  ) {
+    this.json = json;
+
+    const f: Texture[] = [];
+    
+    let i = 0;
+    nested:
+    for (let r = 0; r < json.rows; r++) {
+      for (let c = 0; c < json.columns; c++) {
+        i++;
+        if (i > json.durations.length) {
+          break nested;
+        }
+        f.push(new Texture({
+          source: textureSource,
+          frame: new Rectangle(
+            json.offset + c * (json.padding + json.width),
+            json.offset + r * (json.padding + json.height),
+            json.width,
+            json.height
+          )
+        }));
+      }
+    }
+
+    this.frames = f;
+  }
+}
+
+export default SpritronImageExport
+`
+let pixiExpImgExpCodeHtml = "";
+const pixiExpImgExpCodeHtmlPromise = codeToHtml(pixiExpImgExpCode, {
+  lang: 'ts',
+  theme: 'vitesse-dark'
+}).then((result) => {
+  pixiExpImgExpCodeHtml = result;
+});
+const pixiTypeImgExpCode =
+`export type ReadonlySpritronImageExportJson = {
+  /**
+   * The width of the frame in pixels
+   */
+  readonly width: number;
+  /**
+   * The height of the frame in pixels
+   */
+  readonly height: number;
+  /**
+   * The outer padding, i.e. how many pixels
+   * you need to skip in each dimension
+   * to reach the start of the first frame
+   */
+  readonly offset: number;
+  /**
+   * Padding in pixels between frames
+   */
+  readonly padding: number;
+  /**
+   * Number of columns of the animation
+   */
+  readonly columns: number;
+  /**
+   * Number of rwos of the animation
+   */
+  readonly rows: number;
+  readonly framesPerSecond: number;
+  /**
+   * Whether animation should loop
+   */
+  readonly loop: boolean;
+  /**
+   * Array containing the duration of each frame.
+   * The duration determines how long a frame
+   * should last compared to a 'normal' frame (duration: 1).
+   * 
+   * A frame with a duration of 2 should last
+   * twice as long and a frame with a duration
+   * of 0.5 should last half as long.
+   * 
+   * This can be achieved by dividing the
+   * animation's frames per second by the
+   * corresponding frame's duration before
+   * using it to calculate the current frame progress.
+   * 
+   * **Be careful when dividing by 0 or
+   * when both dividend and divisor are 0.**
+   */
+  readonly durations: readonly number[];
+  /**
+   * Number of frames of the animation.
+   * 
+   * Should be the same as the length of the durations array.
+   */
+  readonly framesLength: number;
+}
+`;
+let pixiTypeImgExpCodeHtml = "";
+const pixiTypeImgExpCodeHtmlPromise = codeToHtml(pixiTypeImgExpCode, {
+  lang: 'ts',
+  theme: 'vitesse-dark'
+}).then((result) => {
+  pixiTypeImgExpCodeHtml = result;
+});
+export function PixiImgExportCode() {
+	const [sprAnimHtml, setSprAnimHtml] = useState(pixiSprAnimImgExpCodeHtml);
+  useEffect(() => {
+    if (pixiSprAnimImgExpCodeHtml === "") {
+      pixiSprAnimImgExpCodeHtmlPromise.then(() => setSprAnimHtml(pixiSprAnimImgExpCodeHtml))
+    }
+  }, []);
+	const [expHtml, setExpHtml] = useState(pixiExpImgExpCodeHtml);
+  useEffect(() => {
+    if (pixiExpImgExpCodeHtml === "") {
+      pixiExpImgExpCodeHtmlPromise.then(() => setExpHtml(pixiExpImgExpCodeHtml))
+    }
+  }, []);
+	const [typeHtml, setTypeHtml] = useState(pixiTypeImgExpCodeHtml);
+  useEffect(() => {
+    if (pixiTypeImgExpCodeHtml === "") {
+      pixiTypeImgExpCodeHtmlPromise.then(() => setTypeHtml(pixiTypeImgExpCodeHtml))
+    }
+  }, []);
+
+  const [pixiTab, setPixiTab] = useCachedState(
+    "SpritronAnimation.ts",
+    "tutorialPixiImgExpTab",
+    s=>s,s=>s
+  );
+
+  return <>
+  <Tabs
+    value={pixiTab}
+    onChange={(_, v) => {
+      setPixiTab(v);
+    }}
+		sx={{
+			"& button": {
+				textTransform: "none"
+			}
+		}}
+  >
+    <Tab
+      label="SpritronAnimation.ts"
+      value={'SpritronAnimation.ts'}
+    />
+    <Tab
+      label="SpritronImageExport.ts"
+      value={'SpritronImageExport.ts'}
+    />
+    <Tab
+      label="SpritronImageExportJson.d.ts"
+      value={'SpritronImageExportJson.d.ts'}
+    />
+  </Tabs>
+	{
+		pixiTab === "SpritronAnimation.ts"
+		? <CodeDisplay
+			codeHtml={sprAnimHtml}
+			code={pixiSprAnimImgExpCode}
+		/>
+		: pixiTab === "SpritronImageExport.ts"
+		? <CodeDisplay
+			codeHtml={expHtml}
+			code={pixiExpImgExpCode}
+		/>
+		: pixiTab === "SpritronImageExportJson.d.ts"
+		? <CodeDisplay
+			codeHtml={typeHtml}
+			code={pixiTypeImgExpCode}
+		/>
+		: null
+	}
   </>;
 }

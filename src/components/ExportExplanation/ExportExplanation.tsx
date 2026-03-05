@@ -8,7 +8,11 @@ import {
   GodotJsonExportUsage,
   GodotJsonExportCode,
   GodotImgExportCode,
-  GodotImgExportUsage
+  GodotImgExportUsage,
+  PixiJsonExportUsage,
+  PixiJsonExportCode,
+  PixiImgExportUsage,
+  PixiImgExportCode
 } from './CodeSnippets/codeSnippets';
 import useCachedState from '../../utils/useCachedState';
 
@@ -218,7 +222,7 @@ function ExportExplanation({
                   <Link
                     href="#usage-examples-json-exp"
                   >
-                    JSON export (advanced)
+                    JSON export
                   </Link>
                 </li>
               </ul>
@@ -363,13 +367,19 @@ function ExportExplanation({
                 }
               </>
               : engine === "Pixi.js"
-              ? (
-                viewMode === "Code"
-                ? <>TODO</>
+              ? <>
+                <Typography mb={1}>
+                  You need to have typescript installed.
+                </Typography>
+                <Typography mb={1}>
+                  A type definition for the json export is included.
+                </Typography>
+                {viewMode === "Code"
+                ? <PixiImgExportCode />
                 : viewMode === "Usage"
-                ? <>TODO</>
-                : null
-              )
+                ? <PixiImgExportUsage />
+                : null}
+              </>
               : null
             }
             <br/>
@@ -439,13 +449,19 @@ function ExportExplanation({
                 }
               </>
               : engine === "Pixi.js"
-              ? (
-                viewMode === "Code"
-                ? <>TODO</>
+              ? <>
+                <Typography mb={1}>
+                  You need to have typescript installed.
+                </Typography>
+                <Typography mb={1}>
+                  A type definition for the json export is included.
+                </Typography>
+                {viewMode === "Code"
+                ? <PixiJsonExportCode />
                 : viewMode === "Usage"
-                ? <>TODO</>
-                : null
-              )
+                ? <PixiJsonExportUsage />
+                : null}
+              </>
               : null
             }
             <br/>
@@ -455,7 +471,12 @@ function ExportExplanation({
               id='docs'
             />
             <Typography>
-              This section describes the structure of the exports in case the code provided above doesn't cover your usecase or you want to make your own implementation.
+              This section describes the structure of the exports in case the code
+              provided above doesn't cover your usecase
+              or you want to make your own implementation.
+              (Note there is a typescript type definition in the Pixi.js
+              example above, with all the information of the following tables,
+              in case you prefer reading it in that format.)
             </Typography>
             <br/>
             <SectionTitle
