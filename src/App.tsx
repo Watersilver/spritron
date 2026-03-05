@@ -314,6 +314,9 @@ function App() {
                     Click on a frame to select and edit it with the frame options to the left
                   </Typography>
                   <Typography mb={1}>
+                    Ctrl + Click frames to select mutiple
+                  </Typography>
+                  <Typography mb={1}>
                     Drag a frame to reposition it
                   </Typography>
                   <Typography mb={1}>
