@@ -187,6 +187,8 @@ function App() {
             })}
             onResetTutorials={() => {
               setSeenWorkareaControls(false);
+              setSeenAnimFrameControls(false);
+              setSeenPreviewControls(false);
             }}
           />
           <TextureLoader
