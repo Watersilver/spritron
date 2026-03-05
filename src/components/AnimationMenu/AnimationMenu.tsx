@@ -155,7 +155,7 @@ function AnimationOptions({
                   if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
                     anim.fps = 0;
                   } else {
-                    anim.fps = v;
+                    anim.fps = Math.floor(v);
                   }
                 }}
                 label={"FPS"}
@@ -175,7 +175,7 @@ function AnimationOptions({
                     if (Number.isNaN(v) || !Number.isFinite(v) || v < 1) {
                       anim.columnLimit = 1;
                     } else {
-                      anim.columnLimit = v;
+                      anim.columnLimit = Math.floor(v);
                     }
                   }}
                   label={"Columns"}
@@ -192,7 +192,7 @@ function AnimationOptions({
                   if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
                     anim.padding = 1;
                   } else {
-                    anim.padding = v;
+                    anim.padding = Math.floor(v);
                   }
                 }}
                 label={"Padding"}

@@ -11,7 +11,7 @@ function useCachedState<S>(
   useEffect(() => {
     const cache = localStorage.getItem(storageKey);
     const serialized = serialize(s);
-    if (cache != serialized) {
+    if (cache !== serialized) {
       localStorage.setItem(storageKey, serialized);
     }
   }, [s]);

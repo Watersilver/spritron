@@ -5,7 +5,7 @@
 // import "./libs/proxy-state/tests"
 
 
-import { Box, createTheme, CssBaseline, IconButton, Stack, ThemeProvider, Typography, type SxProps, type Theme } from "@mui/material";
+import { Alert, Box, Button, Collapse, createTheme, CssBaseline, IconButton, Stack, ThemeProvider, Typography, type SxProps, type Theme } from "@mui/material";
 import TextureLoader from "./components/TextureLoader/TextureLoader";
 import { useState } from "react";
 import TextureDisplayer from "./components/TextureDisplayer/TextureDisplayer";
@@ -18,6 +18,7 @@ import FrameOptions from "./components/FrameOptions/FrameOptions";
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import PauseIcon from '@mui/icons-material/Pause';
+import useCachedState from "./utils/useCachedState";
 // import Export from "./components/Export/Export";
 
 const darkTheme = createTheme({
@@ -97,6 +98,22 @@ function App() {
   const isAnimSelected = useWatch(() => store.selectedAnimation, () => store.selectedAnimation !== null);
   const animFramesHeight = useWatch(() => store.animFrames.height, () => store.animFrames.height);
 
+  const [seenWorkareaControls, setSeenWorkareaControls] = useCachedState(
+    false,
+    "seenWorkareaControls",
+    s => !!s,s => s ? "yep" : ""
+  );
+  const [seenAnimFrameControls, setSeenAnimFrameControls] = useCachedState(
+    false,
+    "seenAnimFrameControls",
+    s => !!s,s => s ? "yep" : ""
+  );
+  const [seenPreviewControls, setSeenPreviewControls] = useCachedState(
+    false,
+    "seenPreviewControls",
+    s => !!s,s => s ? "yep" : ""
+  );
+
   // const [show,setShow] = useState(true);
 
   // const {files, textures} = useSnapshot(state);
@@ -168,6 +185,9 @@ function App() {
               backgroundColor: theme.palette.background.default,
               pointerEvents: "auto"
             })}
+            onResetTutorials={() => {
+              setSeenWorkareaControls(false);
+            }}
           />
           <TextureLoader
             sx={theme => ({
@@ -186,7 +206,40 @@ function App() {
                 setWorkAreaElement(e);
               }
             }}
-          />
+          >
+            <Collapse
+              in={!seenWorkareaControls}
+            >
+              <Alert
+                severity="info"
+                variant="filled"
+                action={
+                  <Button
+                    variant="contained"
+                    onClick={() => {
+                      setSeenWorkareaControls(true);
+                    }}
+                  >
+                    Got it
+                  </Button>
+                }
+                sx={{
+                  pointerEvents: "auto",
+                  borderRadius: 0
+                }}
+              >
+                <Typography mb={1}>
+                  Click on the grid frames you've defined to add them to your currently selected animation
+                </Typography>
+                <Typography mb={1}>
+                  Middle mouse button to grab and drag screen
+                </Typography>
+                <Typography>
+                  Mouse wheel to adjust scale
+                </Typography>
+              </Alert>
+            </Collapse>
+          </Box>
           <AnimationMenu
             sx={theme => ({
               gridArea: "e",
@@ -217,7 +270,6 @@ function App() {
             sx={{
               gridArea: "g",
               minHeight: animFramesHeight + "vh",
-              // TODO? frame options only appear when frame is selected
               display: "grid",
               gridTemplateAreas: `"frame-options animation-frames animation-preview"`,
               gridTemplateColumns: "auto 1fr auto"
@@ -236,7 +288,43 @@ function App() {
                   setAnimFramesElement(e);
                 }
               }}
-            />
+            >
+              <Collapse
+                in={!seenAnimFrameControls}
+              >
+                <Alert
+                  severity="info"
+                  variant="filled"
+                  action={
+                    <Button
+                      variant="contained"
+                      onClick={() => {
+                        setSeenAnimFrameControls(true);
+                      }}
+                    >
+                      Got it
+                    </Button>
+                  }
+                  sx={{
+                    pointerEvents: "auto",
+                    borderRadius: 0
+                  }}
+                >
+                  <Typography mb={1}>
+                    Click on a frame to select and edit it with the frame options to the left
+                  </Typography>
+                  <Typography mb={1}>
+                    Drag a frame to reposition it
+                  </Typography>
+                  <Typography mb={1}>
+                    Middle mouse button to grab and drag screen
+                  </Typography>
+                  <Typography>
+                    Mouse wheel to adjust scale
+                  </Typography>
+                </Alert>
+              </Collapse>
+            </Box>
             <Box
               sx={{
                 display: "grid",
@@ -267,6 +355,32 @@ function App() {
                 }}
                 onClick={playstop}
               >
+                <Collapse
+                  in={!seenPreviewControls}
+                >
+                  <Alert
+                    severity="info"
+                    variant="filled"
+                    action={
+                      <Button
+                        variant="contained"
+                        onClick={() => {
+                          setSeenPreviewControls(true);
+                        }}
+                      >
+                        Got it
+                      </Button>
+                    }
+                    sx={{
+                      pointerEvents: "auto",
+                      borderRadius: 0
+                    }}
+                  >
+                    <Typography mb={1}>
+                      Animation preview controls appear when you hover over it
+                    </Typography>
+                  </Alert>
+                </Collapse>
                 <PreviewControls
                   sx={{
                     position: "absolute",

@@ -1,4 +1,4 @@
-import { Box, IconButton, type Theme, type SxProps, Typography, Stack, Popover, Link, Alert, Tooltip } from "@mui/material"
+import { Box, IconButton, type Theme, type SxProps, Typography, Stack, Popover, Link, Alert, Tooltip, Button } from "@mui/material"
 import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
 // import InfoOutlineIcon from '@mui/icons-material/InfoOutline';
 import store, { useWatch } from "../../store/store";
@@ -16,8 +16,10 @@ const lineHeight = 1.2;
 const startingHash = location.hash !== "";
 
 function MenuBar({
+  onResetTutorials,
   sx
 }: {
+  onResetTutorials?: () => void;
   sx?: SxProps<Theme>
 }) {
   const [settingsAnchor, setSettingsAnchor] = useState<HTMLButtonElement | null>(null);
@@ -66,20 +68,29 @@ function MenuBar({
           maxWidth: "33vw"
         }}
       >
-        <Typography>
+        <Typography mb={1}>
           Welcome to spritron, an app meant to help you painlessly create animations from spritesheets!
         </Typography>
-        <br />
-        <Typography>
+        <Typography mb={1}>
           Load images, define grids on them, add animations and then click on the grid frames to add them to the animations!
         </Typography>
-        <br />
-        <Typography>
-          Then <Tooltip title="Click for export docs and examples"><Link
-            href="#intro"
-            draggable="false"
-          >export</Link></Tooltip>. That's all!
-        </Typography>
+        <Stack
+          direction="row"
+          alignItems="start"
+          justifyContent='space-between'
+        >
+          <Typography>
+            Then <Tooltip title="Click for export docs and examples"><Link
+              href="#intro"
+              draggable="false"
+            >export</Link></Tooltip>. That's all!
+          </Typography>
+          <Button
+            onClick={onResetTutorials}
+          >
+            Reset tutorials
+          </Button>
+        </Stack>
         <br />
         <Alert
           variant="outlined"

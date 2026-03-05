@@ -76,7 +76,7 @@ function Coords({
     if (Number.isNaN(v) || !Number.isFinite(v)) {
       c[coord] = 0;
     } else {
-      c[coord] = v;
+      c[coord] = Math.floor(v);
     }
     const min = (coord === "x" ? xMin : yMin) || 0;
     if (c[coord] < min) c[coord] = min;

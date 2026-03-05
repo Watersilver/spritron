@@ -563,6 +563,16 @@ function TextureDisplayer({
 
     // Callback gets called when observing starts
     ro.observe(workAreaElement);
+    
+    // // Initialize workArea position, because observer callback
+    // // fires after first render and we need this immediately
+    // const rect = workAreaElement.getBoundingClientRect();
+    // const diffX = rect.x - prev.current.x;
+    // const diffY = rect.y - prev.current.y;
+    // prev.current.x = rect.x;
+    // prev.current.y = rect.y;
+    // store.workArea.pos.x += diffX;
+    // store.workArea.pos.y += diffY;
 
     return () => {
       ro.disconnect();
@@ -714,9 +724,45 @@ function TextureDisplayer({
 
           store.workArea.pos.x += diff.x;
           store.workArea.pos.y += diff.y;
-          workArea.position = store.workArea.pos;
+          workArea.position.x = store.workArea.pos.x;
+          workArea.position.y = store.workArea.pos.y;
 
           workArea.scale = store.workArea.scale;
+        }
+
+        // Clamp work area position
+        if (selectedSpritesheetSprite) {
+          const {
+            x,y,width,height
+          } = workAreaElement.getBoundingClientRect();
+          const sw = selectedSpritesheetSprite?.width ?? 0;
+          const sh = selectedSpritesheetSprite?.height ?? 0;
+          const gutterX = Math.min(10, sw);
+          const gutterY = Math.min(10, sh);
+          if (
+            (x - store.workArea.pos.x) / workArea.scale.x + gutterX > sw
+          ) {
+            store.workArea.pos.x = x - sw * workArea.scale.x + gutterX;
+            workArea.position.x = store.workArea.pos.x;
+          }
+          if (
+            store.workArea.pos.x > x + width - gutterX
+          ) {
+            store.workArea.pos.x = x + width - gutterX;
+            workArea.position.x = store.workArea.pos.x;
+          }
+          if (
+            (y - store.workArea.pos.y) / workArea.scale.y + gutterY > sh
+          ) {
+            store.workArea.pos.y = y - sh * workArea.scale.y + gutterY;
+            workArea.position.y = store.workArea.pos.y;
+          }
+          if (
+            store.workArea.pos.y > y + height - gutterY
+          ) {
+            store.workArea.pos.y = y + height - gutterY;
+            workArea.position.y = store.workArea.pos.y;
+          }
         }
 
         const si = store.selectedImage;
@@ -956,6 +1002,47 @@ function TextureDisplayer({
             delete store.animFrames.transforms[sa];
           }
 
+          
+          // Clamp animFrames area position
+          const aft = store.animFrames.transforms[sa];
+          if (animFramesElement && aft) {
+            const {
+              width,
+              height
+            } = animFramesElement.getBoundingClientRect();
+
+            const afw = scene.animFrames.width;
+            const afh = scene.animFrames.height;
+            const gutterX = Math.min(10, afw);
+            const gutterY = Math.min(10, afh);
+
+            if (
+              gutterX - aft.pos.x > afw
+            ) {
+              aft.pos.x = - afw + gutterX;
+              af.position.x = aft.pos.x;
+            }
+            if (
+              aft.pos.x > width - gutterX
+            ) {
+              aft.pos.x = width - gutterX;
+              af.position.x = aft.pos.x;
+            }
+            if (
+              gutterY - aft.pos.y > afh
+            ) {
+              aft.pos.y = - afh + gutterY;
+              af.position.y = aft.pos.y;
+            }
+            if (
+              aft.pos.y > height - gutterY
+            ) {
+              aft.pos.y = height - gutterY;
+              af.position.y = aft.pos.y;
+            }
+          }
+
+
           const afmp = af.toLocal(store.mousePos);
           store.animFrames.mousePos.x = afmp.x;
           store.animFrames.mousePos.y = afmp.y;
@@ -1050,6 +1137,7 @@ function TextureDisplayer({
               // }
             }
           }
+
 
           // Fuck it rerender anim frames graphics every frame
           // Change only if slow
@@ -1395,7 +1483,13 @@ function TextureDisplayer({
     id = requestAnimationFrame(render);
 
     return () => cancelAnimationFrame(id);
-  }, [scene, workAreaElement, animFramesElement, previewElement]);
+  }, [
+    scene,
+    workAreaElement,
+    animFramesElement,
+    previewElement,
+    selectedSpritesheetSprite
+  ]);
 
   // Logic
   useEffect(() => {
@@ -1565,13 +1659,35 @@ function TextureDisplayer({
 
     const wheel = (e: WheelEvent) => {
       if (isInElement(e, workAreaElement)) {
-        store.workArea.scale -= Math.sign(e.deltaY) * store.workArea.scale * 0.1;
+        const newScale = store.workArea.scale - Math.sign(e.deltaY) * store.workArea.scale * 0.1;
+        if (newScale > 0.5 && newScale < 20) {
+          store.workArea.scale = newScale;
+        } else if (newScale >= 20) {
+          if (store.workArea.scale < 20) {
+            store.workArea.scale = 20;
+          }
+        } else if (newScale <= 0.5) {
+          if (store.workArea.scale > 0.5) {
+            store.workArea.scale = 0.5;
+          }
+        }
       } else if (isInElement(e, animFramesElement)) {
         const sa = store.selectedAnimation;
         if (sa !== null) {
           const t = store.animFrames.transforms[sa];
           if (t) {
-            t.scale -= Math.sign(e.deltaY) * t.scale * 0.1;
+            const newScale = t.scale - Math.sign(e.deltaY) * t.scale * 0.1;
+            if (newScale > 0.5 && newScale < 20) {
+              t.scale = newScale;
+            } else if (newScale >= 20) {
+              if (t.scale < 20) {
+                t.scale = 20;
+              }
+            } else if (newScale <= 0.5) {
+              if (t.scale > 0.5) {
+                t.scale = 0.5;
+              }
+            }
           }
         }
       }

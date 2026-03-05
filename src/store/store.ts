@@ -185,6 +185,7 @@ const store = proxify<Store>({
   extractImageAnimData: true,
   // selectedAnimationObj: null
 });
+
 // Initialize colours
 for (const c of (Object.keys(store.colours) as unknown as (keyof typeof store["colours"])[])) {
   const stored = localStorage.getItem(c + "Colour");
