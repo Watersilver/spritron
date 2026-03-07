@@ -1514,6 +1514,8 @@ function TextureDisplayer({
       if (!d) return;
 
       if (isInElement(e, workAreaElement)) {
+        e.stopPropagation();
+        e.preventDefault();
         if (e.button === 0) {
 
           if (store.eyedropTool !== null) {
@@ -1551,6 +1553,8 @@ function TextureDisplayer({
           grab(workAreaElement);
         }
       } else if (isInElement(e, animFramesElement)) {
+        e.stopPropagation();
+        e.preventDefault();
         if (e.button === 0) {
 
           if (store.eyedropTool !== null) {
