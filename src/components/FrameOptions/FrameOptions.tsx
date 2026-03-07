@@ -3,8 +3,6 @@ import store, { useWatch } from "../../store/store";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { deproxify } from "../../libs/proxy-state";
 
-// TODO: how can the user know what pressing control click does?
-
 function getUnifiedValue<T, S>(
   frames: typeof store.animations[number]['frames'],
   getter: (f: typeof store.animations[number]['frames'][number]) => T,
