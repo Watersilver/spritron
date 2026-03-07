@@ -427,7 +427,7 @@ function App() {
               variant="subtitle2"
               color="textDisabled"
             >
-              Version 1.0
+              Version 1.0.1
             </Typography>
           </Stack>
           {/* <Box>

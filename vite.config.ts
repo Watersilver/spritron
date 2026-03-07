@@ -56,5 +56,5 @@ export default defineConfig({
       },
     })
   ],
-  base: "/spritron/"
+  base: "./"
 })
