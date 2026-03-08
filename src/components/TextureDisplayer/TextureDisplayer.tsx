@@ -1663,6 +1663,8 @@ function TextureDisplayer({
 
     const wheel = (e: WheelEvent) => {
       if (isInElement(e, workAreaElement)) {
+        e.stopPropagation();
+        e.preventDefault();
         const newScale = store.workArea.scale - Math.sign(e.deltaY) * store.workArea.scale * 0.1;
         if (newScale > 0.5 && newScale < 20) {
           store.workArea.scale = newScale;
@@ -1676,6 +1678,8 @@ function TextureDisplayer({
           }
         }
       } else if (isInElement(e, animFramesElement)) {
+        e.stopPropagation();
+        e.preventDefault();
         const sa = store.selectedAnimation;
         if (sa !== null) {
           const t = store.animFrames.transforms[sa];
