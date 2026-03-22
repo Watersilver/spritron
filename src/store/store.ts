@@ -56,7 +56,7 @@ type Animation = {
   transfrom?: Transform;
 }
 
-type Store = {
+export type Store = {
   files: File[];
   images: ImageAsset[];
   transMaps: {

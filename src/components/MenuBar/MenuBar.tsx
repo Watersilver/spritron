@@ -1,14 +1,13 @@
 import { Box, IconButton, type Theme, type SxProps, Typography, Stack, Popover, Link, Alert, Tooltip, Button } from "@mui/material"
 import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
-// import InfoOutlineIcon from '@mui/icons-material/InfoOutline';
 import store, { useWatch } from "../../store/store";
 import ColourInput from "../ColourInput/ColourInput";
 import Export from "../Export/Export";
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useEffect, useState } from "react";
 import ExportExplanation from "../ExportExplanation/ExportExplanation";
-// TODO: add ai joke
-// import AutoAwesomeTwoToneIcon from '@mui/icons-material/AutoAwesomeTwoTone';
+import Import from "../Import/Import";
+import Reload from "../Reload/Reload";
 
 
 const lineHeight = 1.2;
@@ -17,10 +16,14 @@ const startingHash = location.hash !== "";
 
 function MenuBar({
   onResetTutorials,
+  onClickReload,
+  onImport,
   sx
 }: {
   onResetTutorials?: () => void;
-  sx?: SxProps<Theme>
+  onClickReload: () => void;
+  onImport: (data: string, notFound?: boolean) => void;
+  sx?: SxProps<Theme>;
 }) {
   const [settingsAnchor, setSettingsAnchor] = useState<HTMLButtonElement | null>(null);
   const [helpAnchor, setHelpAnchor] = useState<HTMLButtonElement | null>(null);
@@ -73,6 +76,9 @@ function MenuBar({
         </Typography>
         <Typography mb={1}>
           Load images, define grids on them, add animations and then click on the grid frames to add them to the animations!
+        </Typography>
+        <Typography mb={1}>
+          Ctrl+s to save your progress!
         </Typography>
         <Stack
           direction="row"
@@ -248,9 +254,17 @@ function MenuBar({
         sx={{
           width: "100%",
           display: "grid",
-          gridTemplateColumns: "auto 1fr auto auto"
+          gridTemplateColumns: "auto auto auto 1fr auto auto"
         }}
       >
+        <Reload
+          sx={{fontWeight: 700}}
+          onClick={onClickReload}
+        />
+        <Import
+          sx={{fontWeight: 700}}
+          onImport={onImport}
+        />
         <Export
           anchorOrigin={{
             vertical: "bottom",

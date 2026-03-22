@@ -5,9 +5,9 @@
 // import "./libs/proxy-state/tests"
 
 
-import { Alert, Box, Button, Collapse, createTheme, CssBaseline, IconButton, Stack, ThemeProvider, Typography, type SxProps, type Theme } from "@mui/material";
+import { Alert, Box, Button, Collapse, createTheme, CssBaseline, IconButton, Snackbar, Stack, ThemeProvider, Typography, type AlertProps, type SxProps, type Theme } from "@mui/material";
 import TextureLoader from "./components/TextureLoader/TextureLoader";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TextureDisplayer from "./components/TextureDisplayer/TextureDisplayer";
 import MenuBar from "./components/MenuBar/MenuBar";
 import store, { useWatch } from "./store/store";
@@ -19,6 +19,8 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import PauseIcon from '@mui/icons-material/Pause';
 import useCachedState from "./utils/useCachedState";
+import deserializeToStore from "./utils/deserializeToStore";
+import serializeStore from "./utils/serializeStore";
 // import Export from "./components/Export/Export";
 
 const darkTheme = createTheme({
@@ -114,6 +116,41 @@ function App() {
     s => !!s,s => s ? "yep" : ""
   );
 
+  const [savedSnackOpen, setSavedSnackOpen] = useState(false);
+  useEffect(() => {
+    const save = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === "s") {
+          e.preventDefault();
+
+          localStorage.setItem('savedData', serializeStore(store));
+
+          setSavedSnackOpen(p => {
+            if (p) {
+              setTimeout(() => setSavedSnackOpen(true), 200);
+              return false;
+            }
+            return true;
+          });
+        }
+      }
+    }
+
+    addEventListener("keydown", save);
+
+    return () => removeEventListener('keydown', save);
+  }, []);
+
+  const [loadSnackState, setLoadSnackState] = useState<{
+    txt: string;
+    severity: AlertProps['severity'];
+    open: boolean;
+  }>({
+    txt: "",
+    severity: 'success',
+    open: false
+  });
+
   // const [show,setShow] = useState(true);
 
   // const {files, textures} = useSnapshot(state);
@@ -128,6 +165,27 @@ function App() {
   // }
 
   // const [files, setFiles] = useState<File[]>([]);
+
+  const loadData = (data: string) => {
+    const [success, err, parsed] = deserializeToStore(data, store);
+    if (success) {
+      setLoadSnackState({
+        severity: 'success',
+        txt: 'Loaded!',
+        open: true
+      });
+    } else {
+      setLoadSnackState({
+        severity: 'error', 
+        txt: err.type === "missing images"
+        ? "Expected the following images: [" + parsed.images.join(', ') + "] but some were missing."
+        : err.type === "image index fail"
+        ? "Failed to match animation image to loaded image..."
+        : "Something went wrong :(",
+        open: true
+      });
+    }
+  }
 
   return (
     <ThemeProvider
@@ -144,6 +202,33 @@ function App() {
           pointerEvents: 'none'
         }}
       >
+        {/* Save snackbar */}
+        <Snackbar
+          open={savedSnackOpen}
+          onClose={() => setSavedSnackOpen(false)}
+          autoHideDuration={2000}
+          anchorOrigin={{vertical: "top", horizontal: "center"}}
+        >
+          <Alert
+            variant="filled"
+          >
+            Saved!
+          </Alert>
+        </Snackbar>
+        {/* Load snackbar */}
+        <Snackbar
+          open={loadSnackState.open}
+          onClose={() => setLoadSnackState(p => ({...p, open: false}))}
+          autoHideDuration={2000}
+          anchorOrigin={{vertical: "top", horizontal: "center"}}
+        >
+          <Alert
+            variant="filled"
+            severity={loadSnackState.severity}
+          >
+            {loadSnackState.txt}
+          </Alert>
+        </Snackbar>
         <TextureDisplayer
           sx={{
             position: "absolute",
@@ -189,6 +274,29 @@ function App() {
               setSeenWorkareaControls(false);
               setSeenAnimFrameControls(false);
               setSeenPreviewControls(false);
+            }}
+            onClickReload={() => {
+              const data = localStorage.getItem("savedData");
+              if (data === null) {
+                setLoadSnackState({
+                  severity: 'info',
+                  txt: 'No data to load...',
+                  open: true
+                });
+                return;
+              }
+              loadData(data);
+            }}
+            onImport={(data, notFound) => {
+              if (notFound) {
+                setLoadSnackState({
+                  severity: 'error',
+                  txt: 'File not found...',
+                  open: true
+                });
+                return;
+              }
+              loadData(data);
             }}
           />
           <TextureLoader
@@ -427,7 +535,7 @@ function App() {
               variant="subtitle2"
               color="textDisabled"
             >
-              Version 1.0.4
+              Version 1.1.0
             </Typography>
           </Stack>
           {/* <Box>
